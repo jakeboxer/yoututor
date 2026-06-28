@@ -1,6 +1,6 @@
 {
   "name": "yoututor",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
@@ -13,5 +13,12 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
     "zod": "^4.4.3"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "bun test"
   }
 }
