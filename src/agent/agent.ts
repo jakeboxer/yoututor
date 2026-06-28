@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+// Semantic events the loop emits. A renderer consumes these and decides how to display them.
+// Add new variants as the loop grows.
+export type AgentEvent = { type: "text"; text: string };
+
 export default class Agent {
 	private client = new Anthropic();
 
-	async run(): Promise<void> {
-		// Minimal chat CLI: read a line, send it to Claude, print the reply, repeat.
-		// The SDK reads ANTHROPIC_API_KEY from the environment (Bun auto-loads .env).
-
+	async *run(): AsyncGenerator<AgentEvent> {
 		while (true) {
 			// Exit on EOF.
 			const untrimmedLine = prompt(">");
@@ -16,7 +17,7 @@ export default class Agent {
 			const line = untrimmedLine.trim();
 			if (line === "/exit") break;
 
-			// Skip blank lines — the API rejects empty message content.
+			// Skip blank lines. The Anthropic API rejects empty message content.
 			if (line === "") continue;
 
 			// Send the line to Claude and wait for the full reply.
@@ -27,10 +28,10 @@ export default class Agent {
 			});
 
 			// response.content is a list of blocks.
-			// Print the text of each text block.
+			// Emit each text block as an event so a rendered can consume it and decide how to display it.
 			for (const block of response.content) {
 				if (block.type === "text") {
-					console.log(block.text);
+					yield { type: "text", text: block.text };
 				}
 			}
 		}

@@ -1,3 +1,7 @@
 import Agent from "./agent/agent";
 
-new Agent().run();
+for await (const event of new Agent().run()) {
+	if (event.type === "text") {
+		console.log(event.text);
+	}
+}
