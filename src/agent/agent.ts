@@ -110,8 +110,14 @@ export default class Agent {
 				const toolResults: Anthropic.ToolResultBlockParam[] = [];
 				for (const block of response.content) {
 					if (block.type === "tool_use") {
-						// block.input is already-parsed JSON, shaped by the tool's input_schema.
+						// Announce the run BEFORE executing, so a renderer can show progress while a slow tool
+						// is in flight.
+						yield { type: "toolRunStarted", name: block.name, input: block.input };
+
 						const result = runTool(block.name, block.input);
+
+						yield { type: "toolRunFinished", name: block.name, result };
+
 						toolResults.push({
 							type: "tool_result",
 							tool_use_id: block.id, // ties this result to the request it answers

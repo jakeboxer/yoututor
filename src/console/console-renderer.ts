@@ -6,8 +6,17 @@ import type { AgentEvent } from "../agent/agent-event.ts";
 // interface lands — implemented by this and an Ink renderer — `handle` is the method it'll define.
 export class ConsoleRenderer {
 	handle(event: AgentEvent): void {
-		if (event.type === "text") {
-			console.log(event.text);
+		switch (event.type) {
+			case "text":
+				console.log(event.text);
+				break;
+			// The event carries the full input/result; the renderer chooses a compact display.
+			case "toolRunStarted":
+				console.log(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
+				break;
+			case "toolRunFinished":
+				console.log(`✓ ${event.name}`);
+				break;
 		}
 	}
 }
