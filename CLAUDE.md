@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 YouTutor is a command-line tutor for YouTube videos: load a video, then ask questions about specific moments. It answers using both the transcript around a timestamp and the actual video frames from that point.
 
-**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class whose `async *run()` generator yields `AgentEvent`s (**Output port**) and `await`s an injected `Host` for the next user turn (**Input port** — `requestInput(): Promise<string | null>`, null on EOF); both ports are built. `src/index.ts` is the console interface: it supplies the `Host` (wrapping Bun's blocking `prompt()`) and consumes events via `for await`. Each line goes single-turn to `claude-haiku-4-5` (Haiku during dev; a model selector defaulting to Opus comes later). Not yet built: the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
+**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class (constructed with a `Host` and the video URL). Its `async *run()` generator maintains the full conversation — appending each user turn and Claude's reply to a `messages` array — and sends it to `claude-haiku-4-5` with a system prompt from `src/agent/system-prompt.ts` (default export). It yields `AgentEvent`s (**Output port**, in `src/agent/agent-event.ts`) and `await`s the injected `Host` (**Input port** — `src/agent/host.ts`, `requestInput(): Promise<string | null>`, null on EOF). The console interface lives in `src/console/`: `console-host.ts` (`consoleHost`, wraps Bun's blocking `prompt()`) and `console-renderer.ts` (`ConsoleRenderer.handle(event)`). `src/index.ts` is a thin composition root: it requires a YouTube URL as the first CLI arg (`Bun.argv[2]`; errors if missing), wires host + agent + renderer, then drives the event loop. Haiku is the dev model; a selector defaulting to Opus comes later. Not yet built: the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
 
 ## Runtime & commands
 
@@ -32,6 +32,7 @@ These flags change how code must be written:
 - `noUncheckedIndexedAccess` → indexed/array access is `T | undefined`; narrow before use.
 - `exactOptionalPropertyTypes` → don't assign `undefined` to an optional prop; omit it instead.
 - Strict mode plus `noImplicitReturns` and `noFallthroughCasesInSwitch` are on.
+- File/module layout: kebab-case filenames, one port/type per file (`host.ts`, `agent-event.ts`); console UI adapters under `src/console/`. Prefer named exports; reserve default export for a module's single primary thing (`Agent`, the `system-prompt.ts` string).
 
 ## Intended architecture
 
