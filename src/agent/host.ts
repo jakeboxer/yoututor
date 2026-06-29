@@ -3,6 +3,6 @@
 // ends the session. It's async so a UI host (which resolves only when the user submits) and a
 // console host (which is blocking) fit the same shape.
 
-export default type Host = {
+export type Host = {
 	requestInput(): Promise<string | null>;
 };

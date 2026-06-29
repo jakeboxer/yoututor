@@ -6,7 +6,10 @@ import SYSTEM_PROMPT from "./system-prompt.ts";
 export default class Agent {
 	private client = new Anthropic();
 
-	constructor(private host: Host) {}
+	constructor(
+		private host: Host,
+		private videoUrl: string,
+	) {}
 
 	async *run(): AsyncGenerator<AgentEvent> {
 		// The running conversation. Each turn appends the user message and Claude's reply, so the
