@@ -30,3 +30,6 @@ coverage/
 # Frame extraction scratch / media artifacts
 tmp/
 *.tmp
+
+# Claude Code local notes
+.claude.local.md

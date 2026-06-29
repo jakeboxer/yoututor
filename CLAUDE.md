@@ -6,20 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 YouTutor is a command-line tutor for YouTube videos: load a video, then ask questions about specific moments. It answers using both the transcript around a timestamp and the actual video frames from that point.
 
-**Current state:** early scaffold. `index.ts` is still a hello-world; the architecture below is the intended design (from `README.md`), not yet built. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
+**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class whose `async *run()` generator yields `AgentEvent`s — the **Output port (below) is built**; `src/index.ts` is the console renderer that consumes them via `for await`. The loop currently reads Bun's global `prompt()` inline and sends each line single-turn to `claude-haiku-4-5` (Haiku during dev; a model selector defaulting to Opus comes later). Not yet built: the Input/`Host` port, the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
 
 ## Runtime & commands
 
 This is a **Bun** project (not Node). Always prefer Bun tooling — see `.cursor/rules/use-bun-instead-of-node-vite-npm-pnpm.mdc` for the full list. Highlights:
 
-- Run: `bun index.ts` (or `bun run <file>`); `bun --hot <file>` for hot reload
+- Run: `bun src/index.ts`; `bun run dev` for watch mode; `bun --hot <file>` for hot reload
 - Install: `bun install` (never npm/pnpm/yarn)
 - Test: `bun test`; single file `bun test <path>`; single case `bun test -t "<name>"`
 - Lint/format: `bunx biome check` (lint), `bunx biome format --write .` (format), `bunx biome check --write .` (fix). Biome 2.5 is installed but **not yet configured** — add a `biome.json` if defaults need changing.
 - Bun auto-loads `.env` (no dotenv). The Anthropic SDK will expect `ANTHROPIC_API_KEY` there.
 - Prefer Bun built-ins over npm equivalents: `Bun.file` over `node:fs`, `Bun.$\`...\`` over execa/child_process, `Bun.serve()` over express.
 
-No build/lint/test scripts exist in `package.json` yet — invoke the tools directly as above.
+`package.json` scripts: `bun run dev` (watch), `bun run start`, `bun run typecheck` (`tsc --noEmit`), `bun run lint` (`biome check .`), `bun run test`.
 
 ## TypeScript conventions (enforced by tsconfig.json)
 
