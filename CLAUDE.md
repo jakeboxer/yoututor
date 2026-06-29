@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 YouTutor is a command-line tutor for YouTube videos: load a video, then ask questions about specific moments. It answers using both the transcript around a timestamp and the actual video frames from that point.
 
-**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class whose `async *run()` generator yields `AgentEvent`s — the **Output port (below) is built**; `src/index.ts` is the console renderer that consumes them via `for await`. The loop currently reads Bun's global `prompt()` inline and sends each line single-turn to `claude-haiku-4-5` (Haiku during dev; a model selector defaulting to Opus comes later). Not yet built: the Input/`Host` port, the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
+**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class whose `async *run()` generator yields `AgentEvent`s (**Output port**) and `await`s an injected `Host` for the next user turn (**Input port** — `requestInput(): Promise<string | null>`, null on EOF); both ports are built. `src/index.ts` is the console interface: it supplies the `Host` (wrapping Bun's blocking `prompt()`) and consumes events via `for await`. Each line goes single-turn to `claude-haiku-4-5` (Haiku during dev; a model selector defaulting to Opus comes later). Not yet built: the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
 
 ## Runtime & commands
 
@@ -15,7 +15,8 @@ This is a **Bun** project (not Node). Always prefer Bun tooling — see `.cursor
 - Run: `bun src/index.ts`; `bun run dev` for watch mode; `bun --hot <file>` for hot reload
 - Install: `bun install` (never npm/pnpm/yarn)
 - Test: `bun test`; single file `bun test <path>`; single case `bun test -t "<name>"`
-- Lint/format: `bunx biome check` (lint), `bunx biome format --write .` (format), `bunx biome check --write .` (fix). Biome 2.5 is installed but **not yet configured** — add a `biome.json` if defaults need changing.
+- Lint/format: `bunx biome check` (lint), `bunx biome format --write .` (format), `bunx biome check --write .` (fix). Configured in `biome.json`: tabs, `lineWidth` 100, double quotes, recommended rules + `correctness.useImportExtensions: error`.
+- Gotcha: `useImportExtensions` is a project-domain rule — `biome check`/`bun run lint` catch missing `.ts` extensions, but the Biome editor LSP won't flag them live. Rely on the CLI/pre-commit, not the editor squiggle.
 - Bun auto-loads `.env` (no dotenv). The Anthropic SDK will expect `ANTHROPIC_API_KEY` there.
 - Prefer Bun built-ins over npm equivalents: `Bun.file` over `node:fs`, `Bun.$\`...\`` over execa/child_process, `Bun.serve()` over express.
 
@@ -26,7 +27,8 @@ This is a **Bun** project (not Node). Always prefer Bun tooling — see `.cursor
 These flags change how code must be written:
 
 - `verbatimModuleSyntax` → use `import type { ... }` for type-only imports.
-- `allowImportingTsExtensions` + `noEmit` → import local modules **with** the `.ts` extension (e.g. `import { agent } from "./agent.ts"`).
+- `allowImportingTsExtensions` + `noEmit` → import local modules **with** the `.ts` extension (e.g. `import { agent } from "./agent.ts"`). Enforced by Biome's `useImportExtensions`.
+- Prefer `type` over `interface` for object shapes (e.g. `Host`, `AgentEvent`) — keeps object-shape and union declarations consistent under one keyword.
 - `noUncheckedIndexedAccess` → indexed/array access is `T | undefined`; narrow before use.
 - `exactOptionalPropertyTypes` → don't assign `undefined` to an optional prop; omit it instead.
 - Strict mode plus `noImplicitReturns` and `noFallthroughCasesInSwitch` are on.

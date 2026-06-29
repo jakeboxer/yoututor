@@ -1,24 +1,24 @@
 {
-  "name": "yoututor",
-  "module": "src/index.ts",
-  "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.106.0",
-    "zod": "^4.4.3"
-  },
-  "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
-    "test": "bun test"
-  }
+	"name": "yoututor",
+	"module": "src/index.ts",
+	"type": "module",
+	"private": true,
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.1",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"@anthropic-ai/sdk": "^0.106.0",
+		"zod": "^4.4.3"
+	},
+	"scripts": {
+		"dev": "bun --watch src/index.ts",
+		"start": "bun src/index.ts",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"test": "bun test"
+	}
 }
