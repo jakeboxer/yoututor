@@ -49,9 +49,10 @@ export default class Agent {
 		// One turn may take several round-trips with the model. It might call a tool, read the result,
 		// then answer (or answer directly). We loop until the reply is a final answer.
 		while (true) {
-			// Send the whole conversation PLUS the tool list. Handing over `tools` is what lets the
-			// model reply with a tool request instead of a final answer.
-			const response = await this.client.messages.create({
+			// Stream the reply instead of waiting for the whole thing. Handing over `tools` is still
+			// what lets the model reply with a tool request instead of a final answer; the SDK keeps
+			// assembling the full message behind the scenes so we can read it once the stream ends.
+			const stream = this.client.messages.stream({
 				model: "claude-haiku-4-5",
 				max_tokens: 16000,
 				system: SYSTEM_PROMPT,
@@ -59,17 +60,21 @@ export default class Agent {
 				messages: this.messages,
 			});
 
-			// Append Claude's reply to the history. This includes any tool_use blocks, which MUST stay
-			// in the conversation — the tool_result we add below points back at them by id.
-			this.messages.push({ role: "assistant", content: response.content });
-
-			// The model can write text AND request a tool in the same reply, so emit any text now,
-			// before deciding what to do next.
-			for (const block of response.content) {
-				if (block.type === "text") {
-					yield { type: "text", text: block.text };
+			// Emit each chunk of answer text the moment it arrives. We stream ONLY text — a tool call's
+			// input arrives as partial JSON, which we'd rather read fully-formed from finalMessage().
+			for await (const event of stream) {
+				if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+					yield { type: "textDelta", text: event.delta.text };
 				}
 			}
+
+			// The SDK assembled the whole reply from the stream — the same shape create() returns. Use
+			// it for history and control flow (text blocks, tool_use blocks, stop_reason).
+			const response = await stream.finalMessage();
+			this.messages.push({ role: "assistant", content: response.content });
+
+			// Signal the reply is complete, so a renderer can close the streamed line of text.
+			yield { type: "modelResponded" };
 
 			// If no tool requested, this reply is the final answer. Break and let the caller decide what
 			// happens next. (Any stop_reason other than "tool_use" means "done for now".)
