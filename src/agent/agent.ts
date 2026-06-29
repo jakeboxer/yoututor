@@ -2,54 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
-
-// --- Tools (temporary home) -------------------------------------------------
-// For this step the tool and its implementation live right here in the agent file.
-// A later step moves them behind a `ToolRegistry` port, and `load_video` gets a real
-// yt-dlp-backed body. The loop in run() won't care where they live.
-
-// What the MODEL sees: a name, a description telling it WHEN to call this, and a JSON
-// Schema describing the arguments. The model fills in `input` to match the schema.
-const tools: Anthropic.Tool[] = [
-	{
-		name: "load_video",
-		description:
-			"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Returns the timestamped transcript.",
-		input_schema: {
-			type: "object",
-			properties: {
-				url: { type: "string", description: "The YouTube video URL to load." },
-			},
-			required: ["url"],
-		},
-	},
-];
-
-// What WE do when the model calls a tool: return a string that gets handed back as the
-// tool result. This is a STUB — it ignores the URL and returns fixed fake transcript
-// text, so we can exercise the loop without yt-dlp installed. The deliberately unusual
-// content (garbage collection) makes it obvious from the model's answer whether it
-// actually read the tool result.
-function runTool(name: string, _input: unknown): string {
-	if (name === "load_video") {
-		return [
-			"Transcript loaded (STUB DATA — not a real video):",
-			"[00:00] Welcome back to the channel.",
-			"[00:08] Today we're talking about how garbage collection works.",
-			"[00:15] The core idea: the runtime tracks which objects are still reachable.",
-			"[00:30] Anything no longer reachable can be safely freed.",
-		].join("\n");
-	}
-	return `Unknown tool: ${name}`;
-}
-
-// ----------------------------------------------------------------------------
+import type { ToolRegistry } from "./tool-registry.ts";
 
 export default class Agent {
 	private client = new Anthropic();
 
 	constructor(
 		private host: Host,
+		private toolRegistry: ToolRegistry,
 		private videoUrl: string,
 	) {}
 
@@ -84,7 +44,7 @@ export default class Agent {
 					model: "claude-haiku-4-5",
 					max_tokens: 16000,
 					system: SYSTEM_PROMPT,
-					tools,
+					tools: this.toolRegistry.schemas,
 					messages,
 				});
 
@@ -114,7 +74,7 @@ export default class Agent {
 						// is in flight.
 						yield { type: "toolRunStarted", name: block.name, input: block.input };
 
-						const result = runTool(block.name, block.input);
+						const result = await this.toolRegistry.run(block.name, block.input);
 
 						yield { type: "toolRunFinished", name: block.name, result };
 
