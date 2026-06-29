@@ -1,4 +1,5 @@
-import Agent, { type Host } from "./agent/agent.ts";
+import Agent from "./agent/agent.ts";
+import { type Host } from "./agent/host.ts";
 
 // Console host: owns reading input from the terminal. The loop calls this when it needs the
 // user's next turn; we wrap Bun's blocking prompt() and hand back the line (null on Ctrl+D).
