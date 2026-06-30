@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $, Glob } from "bun";
+import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 
 // The load_video tool: fetch a YouTube video's captions with yt-dlp and return them as a
@@ -111,16 +112,6 @@ function parseSrt(srt: string): string {
 	}
 
 	return lines.join("\n");
-}
-
-// Seconds -> [mm:ss], or [h:mm:ss] once the video passes an hour.
-function formatTimestamp(totalSeconds: number): string {
-	const hrs = Math.floor(totalSeconds / 3600);
-	const mins = Math.floor((totalSeconds % 3600) / 60);
-	const secs = Math.floor(totalSeconds % 60);
-	const mm = String(mins).padStart(2, "0");
-	const ss = String(secs).padStart(2, "0");
-	return hrs > 0 ? `${hrs}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
 // Keep only the last few lines of (possibly long) yt-dlp error output.
