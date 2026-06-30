@@ -1,6 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-
-export type ToolResult = NonNullable<Anthropic.ToolResultBlockParam["content"]>;
+import type { ToolResult } from "./tool-result.ts";
 
 // One tool: the schema the model sees, paired with the handler we run when it's called.
 // Co-locating them keeps "what the model sees" and "what we actually do" in a single object, so
@@ -8,6 +7,6 @@ export type ToolResult = NonNullable<Anthropic.ToolResultBlockParam["content"]>;
 export type Tool = {
 	// The schema advertised to the model (name, description, input JSON Schema).
 	schema: Anthropic.Tool;
-	// Execute the tool with the model-supplied input; return the result string.
+	// Execute the tool with the model-supplied input; return the result of the tool call.
 	run(input: unknown): Promise<ToolResult>;
 };

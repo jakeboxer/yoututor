@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { ToolResult } from "../tools/tool.ts";
+import type { ToolResult } from "../tools/tool-result.ts";
 
 export type ToolRegistry = {
 	// Schemas sent to the model on every request.

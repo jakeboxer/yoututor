@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { summarizeResult } from "../tools/tool-result.ts";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
@@ -91,7 +92,7 @@ export default class Agent {
 
 					const result = await this.toolRegistry.run(block.name, block.input);
 
-					yield { type: "toolRunFinished", name: block.name, result };
+					yield { type: "toolRunFinished", name: block.name, result: summarizeResult(result) };
 
 					toolResults.push({
 						type: "tool_result",
@@ -131,7 +132,7 @@ export default class Agent {
 		// call, including the progress events, so a renderer shows the load happening.
 		yield { type: "toolRunStarted", name: "load_video", input };
 		const result = await this.toolRegistry.run("load_video", input);
-		yield { type: "toolRunFinished", name: "load_video", result };
+		yield { type: "toolRunFinished", name: "load_video", result: summarizeResult(result) };
 
 		this.messages.push({
 			role: "user",
