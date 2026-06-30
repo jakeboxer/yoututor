@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 YouTutor is a command-line tutor for YouTube videos: load a video, then ask questions about specific moments. It answers using both the transcript around a timestamp and the actual video frames from that point.
 
-**Current state:** early scaffold, source under `src/`. `src/agent/agent.ts` holds the `Agent` class (constructed with a `Host` and the video URL). Its `async *run()` generator maintains the full conversation — appending each user turn and Claude's reply to a `messages` array — and sends it to `claude-haiku-4-5` with a system prompt from `src/agent/system-prompt.ts` (default export). It yields `AgentEvent`s (**Output port**, in `src/agent/agent-event.ts`) and `await`s the injected `Host` (**Input port** — `src/agent/host.ts`, `requestInput(): Promise<string | null>`, null on EOF). The console interface lives in `src/console/`: `console-host.ts` (`consoleHost`, wraps Bun's blocking `prompt()`) and `console-renderer.ts` (`ConsoleRenderer.handle(event)`). `src/index.ts` is a thin composition root: it requires a YouTube URL as the first CLI arg (`Bun.argv[2]`; errors if missing), wires host + agent + renderer, then drives the event loop. Haiku is the dev model; a selector defaulting to Opus comes later. Not yet built: the `ToolRegistry` and tools, and the Ink UI. The build order in the README's roadmap is deliberate — get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
+**Layout & intent.** The agent loop lives in `src/agent/` (`agent.ts` runs the model conversation and the tool-call loop, streaming the reply); tools live under `src/tools/` (each a `Tool`, collected in `registry.ts`); console adapters live under `src/console/` (host + renderer). `src/index.ts` is a thin composition root that takes the YouTube URL as its first CLI arg and wires host + tools + agent + renderer. The loop reaches the world only through two ports — an **Output** event stream and an injected **Input** `Host`, detailed under *Intended architecture* below — and stays UI-agnostic. Haiku is the dev model. The build order is deliberate: get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
 
 ## Runtime & commands
 
@@ -64,5 +64,5 @@ The harness shells out to external binaries — these must be installed on the s
 ## Key libraries
 
 - `@anthropic-ai/sdk` — the model behind the loop
-- `zod` — schema validation (e.g. tool input schemas)
+- `zod` — tool input schemas, single source of truth: per tool define `const Input = z.object({...})` (`.describe()` for field docs), set `input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"]`, and `Input.safeParse(input)` in `run` — never hand-write `input_schema`. Use Zod only at structured model/tool boundaries, not free-text parsing (SRT) or `/exit`-style command handling.
 - `ink` — terminal UI, added last on top of the solid loop
