@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $, Glob } from "bun";
+import { tail } from "./tail.ts";
 import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 
@@ -112,9 +113,4 @@ function parseSrt(srt: string): string {
 	}
 
 	return lines.join("\n");
-}
-
-// Keep only the last few lines of (possibly long) yt-dlp error output.
-function tail(text: string, maxLines = 5): string {
-	return text.split("\n").slice(-maxLines).join("\n");
 }

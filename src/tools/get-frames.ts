@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { $ } from "bun";
 import { z } from "zod";
+import { tail } from "./tail.ts";
 import { parseTimestamp, TIMESTAMP_PATTERN } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 import type { ToolResult } from "./tool-result.ts";
@@ -42,7 +43,7 @@ export function createGetFramesTool(videoUrl: string): Tool {
 			// fetch only the bytes around each frame via HTTP range requests, instead of downloading the
 			// whole video just to grab a handful of stills.
 			const stream = await resolveStreamUrl(videoUrl);
-			if ("error" in stream) return stream.error;
+			if (!stream.ok) return stream.error;
 
 			// Frames are independent, so pull them concurrently.
 			const frames = await Promise.all(
@@ -54,8 +55,7 @@ export function createGetFramesTool(videoUrl: string): Tool {
 
 			for (const frame of frames) {
 				if (frame.ok) {
-					// Label each frame: the model asked for several timestamps and otherwise can't tell the
-					// returned images apart.
+					// Label each frame so the model can tell the returned images apart.
 					blocks.push({ type: "text", text: `Frame at ${frame.label}:` });
 					blocks.push({
 						type: "image",
@@ -124,7 +124,9 @@ async function extractFrame(streamUrl: string, label: string): Promise<FrameResu
 
 // Resolve a direct, seekable video-stream URL for the video with yt-dlp's -g.
 // Returns the URL, or a plain-English explanation if it couldn't be resolved.
-async function resolveStreamUrl(videoUrl: string): Promise<{ url: string } | { error: string }> {
+async function resolveStreamUrl(
+	videoUrl: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
 	// Prefer an H.264 MP4 video track (the most ffmpeg-friendly), capped at 720p to keep range
 	// fetches small. Fall back to a progressive stream, then to whatever's best.
 	// bestvideo/best each resolve to a single URL, so -g prints one line.
@@ -141,17 +143,13 @@ async function resolveStreamUrl(videoUrl: string): Promise<{ url: string } | { e
 	if (result.exitCode !== 0) {
 		const stderr = tail(result.stderr.toString().trim());
 		return {
+			ok: false,
 			error: `Couldn't get the video stream — yt-dlp exited with code ${result.exitCode}:\n${stderr}`,
 		};
 	}
 
 	const url = result.stdout.toString().trim().split("\n")[0];
-	if (!url) return { error: "yt-dlp didn't return a video stream URL." };
+	if (!url) return { ok: false, error: "yt-dlp didn't return a video stream URL." };
 
-	return { url };
-}
-
-// Keep only the last few lines of (possibly long) error output.
-function tail(text: string, maxLines = 5): string {
-	return text.split("\n").slice(-maxLines).join("\n");
+	return { ok: true, url };
 }
