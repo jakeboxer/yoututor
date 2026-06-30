@@ -23,7 +23,7 @@ The model drives these; it isn't a hardcoded sequence.
 | --- | --- |
 | `load_video(url)` | Fetches the timestamped transcript for the video (see below) and prepares it for querying. Auto-called on the initial URL. |
 | `get_transcript_window(timestamp, ±seconds)` | Returns the slice of transcript text around a point in time, not the whole thing. |
-| `get_frames(timestamp, count)` | Extracts a few frames near a timestamp (via ffmpeg) and returns them as images for the model to look at. |
+| `get_frames(timestamps)` | Extracts a frame at each requested timestamp (seconds, via ffmpeg) and returns them as images for the model to look at. The model picks the exact timestamps, so it controls granularity — spread them out to track change over time, or cluster them on one moment. |
 
 ### Transcripts: captions-first, ASR fallback
 

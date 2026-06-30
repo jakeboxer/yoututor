@@ -49,7 +49,7 @@ The whole point of the design is a hard separation between the **agent loop** (t
 
 - `load_video(url)` — fetch the timestamped transcript; auto-called on the initial URL.
 - `get_transcript_window(timestamp, ±seconds)` — return a slice of transcript around a point, not the whole thing.
-- `get_frames(timestamp, count)` — extract frames near a timestamp via ffmpeg, return as images for the model to view.
+- `get_frames(timestamps)` — extract one frame per timestamp (seconds, via ffmpeg), return as images for the model to view. The model passes an explicit list, so it owns the granularity (spread vs. cluster) rather than the tool guessing a spacing around a single point.
 
 **Transcripts are captions-first with ASR fallback:** `load_video` tries the video's existing captions (via yt-dlp) first since they're instant; falls back to transcribing audio with a Whisper-class model when captions are missing or low quality.
 
