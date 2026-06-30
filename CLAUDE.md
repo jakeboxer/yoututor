@@ -45,11 +45,11 @@ The whole point of the design is a hard separation between the **agent loop** (t
 - **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`, `turnComplete`). The interface consumes them with `for await` and renders however it likes (console → stdout; Ink → React state).
 - **Input** — when the loop needs the next user turn or permission to run a tool, it `await`s a method on an injected `Host` port. The host owns both displaying the prompt and returning the answer.
 
-**Tools** live behind a separate `ToolRegistry` port (kept distinct from `Host` — human interaction vs. tool execution are different concerns):
+**Tools** live behind a separate `ToolRegistry` port (kept distinct from `Host` — human interaction vs. tool execution are different concerns). Timestamps everywhere — tool args and transcript output alike — are clock-formatted: `mm:ss` or `h:mm:ss`, optionally with fractional seconds (e.g. `0:45.2`).
 
 - `load_video(url)` — fetch the timestamped transcript; auto-called on the initial URL.
-- `get_transcript_window(timestamp, ±seconds)` — return a slice of transcript around a point, not the whole thing.
-- `get_frames(timestamps)` — extract one frame per timestamp (seconds, via ffmpeg), return as images for the model to view. The model passes an explicit list, so it owns the granularity (spread vs. cluster) rather than the tool guessing a spacing around a single point.
+- `get_transcript_range(start_timestamp, end_timestamp)` — return the transcript text spanning the two timestamps. The model passes explicit bounds, so it owns the span (and can ask for an asymmetric window — e.g. the lead-up to a moment).
+- `get_frames(timestamps)` — extract one frame per timestamp (via ffmpeg), return as images for the model to view. The model passes an explicit list, so it owns the granularity (spread vs. cluster) rather than the tool guessing a spacing around a single point.
 - A tool returns a plain-English string on failure (shell-outs: `Bun.$`...`.quiet().nothrow()` + exit-code checks) rather than throwing — a failed tool must never crash the loop. Partial success is fine: `get_frames` returns the frames it got plus a text note for the rest.
 
 **Transcripts are captions-first with ASR fallback:** `load_video` tries the video's existing captions (via yt-dlp) first since they're instant; falls back to transcribing audio with a Whisper-class model when captions are missing or low quality.

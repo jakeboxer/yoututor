@@ -17,13 +17,13 @@ It cycles until the model stops asking for tools and just answers. A single ques
 
 ## Tools
 
-The model drives these; it isn't a hardcoded sequence.
+The model drives these; it isn't a hardcoded sequence. Timestamps throughout — both tool arguments and transcript output — use clock format: `mm:ss` or `h:mm:ss`, optionally with fractional seconds (e.g. `0:45.2`).
 
 | Tool | What it does |
 | --- | --- |
 | `load_video(url)` | Fetches the timestamped transcript for the video (see below) and prepares it for querying. Auto-called on the initial URL. |
-| `get_transcript_window(timestamp, ±seconds)` | Returns the slice of transcript text around a point in time, not the whole thing. |
-| `get_frames(timestamps)` | Extracts a frame at each requested timestamp (seconds, via ffmpeg) and returns them as images for the model to look at. The model picks the exact timestamps, so it controls granularity — spread them out to track change over time, or cluster them on one moment. |
+| `get_transcript_range(start_timestamp, end_timestamp)` | Returns the transcript text between two timestamps. The model picks the start and end, so it controls the span; widen it for more context, or ask for an asymmetric window like the run-up to a moment. |
+| `get_frames(timestamps)` | Extracts a frame at each requested timestamp (via ffmpeg) and returns them as images for the model to look at. The model picks the exact timestamps, so it controls granularity — spread them out to track change over time, or cluster them on one moment. |
 
 ### Transcripts: captions-first, ASR fallback
 
@@ -44,7 +44,7 @@ for await (const ev of agent.run(userText)) {
 }
 ```
 
-Capabilities (`load_video` / `get_transcript_window` / `get_frames`) live behind a separate `ToolRegistry` port, kept distinct from `Host` — human interaction and tool execution are different concerns.
+Capabilities (`load_video` / `get_transcript_range` / `get_frames`) live behind a separate `ToolRegistry` port, kept distinct from `Host` — human interaction and tool execution are different concerns.
 
 The payoff: swapping the bare-bones console interface for a richer Ink UI is a substitution at the edges, with no changes to the loop.
 
@@ -62,7 +62,7 @@ The payoff: swapping the bare-bones console interface for a richer Ink UI is a s
 Early development. The intended build order:
 
 - [x] Agent loop working behind a plain console interface (`readline` in, `console.log` out)
-- [ ] `ToolRegistry` with the three tools — `load_video` + `get_frames` done; `get_transcript_window` pending
+- [ ] `ToolRegistry` with the three tools — `load_video` + `get_frames` done; `get_transcript_range` pending
 - [ ] `load_video` with captions-first / ASR-fallback transcript handling — captions-first done; ASR fallback pending
 - [x] Multimodal frame results fed back into the loop
 - [ ] Tool-permission prompts through the `Host` port
