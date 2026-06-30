@@ -61,10 +61,10 @@ The payoff: swapping the bare-bones console interface for a richer Ink UI is a s
 
 Early development. The intended build order:
 
-- [ ] Agent loop working behind a plain console interface (`readline` in, `console.log` out)
-- [ ] `ToolRegistry` with the three tools
-- [ ] `load_video` with captions-first / ASR-fallback transcript handling
-- [ ] Multimodal frame results fed back into the loop
+- [x] Agent loop working behind a plain console interface (`readline` in, `console.log` out)
+- [ ] `ToolRegistry` with the three tools — `load_video` + `get_frames` done; `get_transcript_window` pending
+- [ ] `load_video` with captions-first / ASR-fallback transcript handling — captions-first done; ASR fallback pending
+- [x] Multimodal frame results fed back into the loop
 - [ ] Tool-permission prompts through the `Host` port
 - [ ] Ink rendering layer swapped in on top
 
@@ -72,10 +72,13 @@ The loop and tool orchestration come first; the Ink UI is layered on last so the
 
 ## Usage
 
-> Intended interface — under construction.
+> Early development, but the console loop runs today.
 
-```
-yoututor <youtube-url>
+Needs `yt-dlp` and `ffmpeg` on your `PATH`, plus an `ANTHROPIC_API_KEY` in `.env` (Bun loads it automatically).
+
+```sh
+bun install
+bun src/index.ts <youtube-url>
 ```
 
-Then ask questions referencing timestamps as you watch.
+It loads the transcript up front, then you ask questions referencing timestamps as you watch. Type `/exit` to quit.
