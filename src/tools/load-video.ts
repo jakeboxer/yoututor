@@ -1,8 +1,12 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type Anthropic from "@anthropic-ai/sdk";
 import { $, Glob } from "bun";
+import { z } from "zod";
 import type { Tool } from "./tool.ts";
+
+const Input = z.object({ url: z.string().min(1).describe("The YouTube video URL to load.") });
 
 // The load_video tool: fetch a YouTube video's captions with yt-dlp and return them as a
 // timestamped transcript. Captions-first — we take the video's existing captions (manual or
@@ -13,29 +17,16 @@ export const loadVideoTool: Tool = {
 		name: "load_video",
 		description:
 			"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Returns the timestamped transcript.",
-		input_schema: {
-			type: "object",
-			properties: {
-				url: { type: "string", description: "The YouTube video URL to load." },
-			},
-			required: ["url"],
-		},
+		input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"],
 	},
 
 	async run(input) {
-		const url = readUrl(input);
-		if (!url) return "load_video was called without a valid `url` string.";
-		return fetchTranscript(url);
+		const parsed = Input.safeParse(input);
+		if (!parsed.success) return "load_video was called without a valid `url` string.";
+
+		return fetchTranscript(parsed.data.url);
 	},
 };
-
-// The model's input arrives as `unknown` (it's whatever JSON the model produced), so narrow it
-// before trusting it. Returns the url string, or null if it's missing/blank/not a string.
-function readUrl(input: unknown): string | null {
-	if (typeof input !== "object" || input === null) return null;
-	const { url } = input as Record<string, unknown>;
-	return typeof url === "string" && url.trim() !== "" ? url : null;
-}
 
 // Download captions for `url` into a fresh temp dir, then parse them.
 // Returns a transcript string, or a plain-English explanation if the fetch failed or the video has
