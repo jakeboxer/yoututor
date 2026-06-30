@@ -64,5 +64,5 @@ The harness shells out to external binaries — these must be installed on the s
 ## Key libraries
 
 - `@anthropic-ai/sdk` — the model behind the loop
-- `zod` — tool input schemas, single source of truth: per tool define `const Input = z.object({...})` (`.describe()` for field docs), set `input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"]`, and `Input.safeParse(input)` in `run` — never hand-write `input_schema`. Use Zod only at structured model/tool boundaries, not free-text parsing (SRT) or `/exit`-style command handling.
+- `zod` — tool input schemas, single source of truth: per tool define `const Input = z.object({...})` (`.describe()` for field docs), set `input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"]`, and `Input.safeParse(input)` in `run` — never hand-write `input_schema`. Exception: an input-less tool may set `input_schema: { type: "object" }` directly — zod would only derive a trivial empty schema, and there's nothing to validate. Use Zod only at structured model/tool boundaries, not free-text parsing (SRT) or `/exit`-style command handling.
 - `ink` — terminal UI, added last on top of the solid loop

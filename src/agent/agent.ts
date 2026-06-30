@@ -114,11 +114,10 @@ export default class Agent {
 	private async *seedLoadVideo(): AsyncGenerator<AgentEvent> {
 		// We invent the tool call, so we invent its id too. The tool_result below points back at it.
 		const toolUseId = "seed_load_video";
-		const input = { url: this.videoUrl };
+		const input = {};
 
 		// Kickoff user message (satisfies "first message must be user") + the fabricated decision to
-		// call load_video. The URL lives in the tool input; it's also in the text so the exchange
-		// reads coherently to the model.
+		// call load_video. The URL lives in the kickoff text below. The tool itself takes no input.
 		this.messages.push({
 			role: "user",
 			content: `Load this video so we can discuss it: ${this.videoUrl}`,

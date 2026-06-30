@@ -1,32 +1,27 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type Anthropic from "@anthropic-ai/sdk";
 import { $, Glob } from "bun";
-import { z } from "zod";
 import type { Tool } from "./tool.ts";
-
-const Input = z.object({ url: z.string().min(1).describe("The YouTube video URL to load.") });
 
 // The load_video tool: fetch a YouTube video's captions with yt-dlp and return them as a
 // timestamped transcript. Captions-first — we take the video's existing captions (manual or
 // YouTube's automatic ones), which are instant. Transcribing the audio ourselves when none exist is
 // a later step.
-export const loadVideoTool: Tool = {
-	schema: {
-		name: "load_video",
-		description:
-			"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Returns the timestamped transcript.",
-		input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"],
-	},
+export function createLoadVideoTool(videoUrl: string): Tool {
+	return {
+		schema: {
+			name: "load_video",
+			description:
+				"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Returns the timestamped transcript.",
+			input_schema: { type: "object" },
+		},
 
-	async run(input) {
-		const parsed = Input.safeParse(input);
-		if (!parsed.success) return "load_video was called without a valid `url` string.";
-
-		return fetchTranscript(parsed.data.url);
-	},
-};
+		async run() {
+			return fetchTranscript(videoUrl);
+		},
+	};
+}
 
 // Download captions for `url` into a fresh temp dir, then parse them.
 // Returns a transcript string, or a plain-English explanation if the fetch failed or the video has
@@ -89,7 +84,7 @@ async function fetchTranscript(url: string): Promise<string> {
 //   00:00:18,800 --> 00:00:25,960
 //   We're no strangers to
 // We keep the start time and the text, and drop the index and end time.
-export function parseSrt(srt: string): string {
+function parseSrt(srt: string): string {
 	const lines: string[] = [];
 	const blocks = srt
 		.replace(/\r\n/g, "\n")
