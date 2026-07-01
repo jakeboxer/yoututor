@@ -2,20 +2,13 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { $ } from "bun";
 import { z } from "zod";
 import { tail } from "./tail.ts";
-import { parseTimestamp, TIMESTAMP_PATTERN } from "./timestamp.ts";
+import { parseTimestamp, TIMESTAMP_DESCRIPTION, TIMESTAMP_PATTERN } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 import type { ToolResult } from "./tool-result.ts";
 
 const Input = z.object({
 	timestamps: z
-		.array(
-			z
-				.string()
-				.regex(
-					TIMESTAMP_PATTERN,
-					'Use "mm:ss" or "h:mm:ss" — e.g. "0:45" is 45 seconds in. Add a decimal for sub-second precision, e.g. "0:45.5".',
-				),
-		)
+		.array(z.string().regex(TIMESTAMP_PATTERN, TIMESTAMP_DESCRIPTION))
 		.min(1)
 		.describe(
 			'The timestamps to grab frames at, each written "mm:ss" or "h:mm:ss" — the same format the ' +

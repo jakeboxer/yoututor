@@ -1,11 +1,16 @@
 import type { ToolRegistry } from "../agent/tool-registry.ts";
 import { createGetFramesTool } from "./get-frames.ts";
+import { createGetTranscriptRangeTool } from "./get-transcript-range.ts";
 import { createLoadVideoTool } from "./load-video.ts";
 import type { Tool } from "./tool.ts";
 
 export function createToolRegistry(videoUrl: string): ToolRegistry {
 	// Every tool the agent can use. Add a capability by writing a Tool and dropping it in this list.
-	const tools: Tool[] = [createLoadVideoTool(videoUrl), createGetFramesTool(videoUrl)];
+	const tools: Tool[] = [
+		createGetFramesTool(videoUrl),
+		createGetTranscriptRangeTool(videoUrl),
+		createLoadVideoTool(videoUrl),
+	];
 
 	// Index tools by their schema name so run() can dispatch by the name the model gives us.
 	const byName = new Map(tools.map((tool) => [tool.schema.name, tool]));

@@ -16,6 +16,9 @@ export function formatTimestamp(totalSeconds: number): string {
 // Matches [h:]mm:ss with optional fractional seconds: "0:45", "1:23", "1:02:03", "0:45.5".
 export const TIMESTAMP_PATTERN = /^(?:\d+:)?\d{1,2}:\d{1,2}(?:\.\d+)?$/;
 
+export const TIMESTAMP_DESCRIPTION =
+	'Use "mm:ss" or "h:mm:ss" — e.g. "0:45" is 45 seconds in. Add a decimal for sub-second precision, e.g. "0:45.5".';
+
 // "[h:]mm:ss[.fff]" -> total seconds. Assumes `label` already matches TIMESTAMP_PATTERN, so each
 // colon-separated part is a clean number; fold them in from most- to least-significant.
 export function parseTimestamp(label: string): number {
