@@ -21,13 +21,13 @@ The model drives these; it isn't a hardcoded sequence. Timestamps throughout —
 
 | Tool | What it does |
 | --- | --- |
-| `load_video(url)` | Fetches the timestamped transcript for the video (see below) and prepares it for querying. Auto-called on the initial URL. |
-| `get_transcript_range(start_timestamp, end_timestamp)` | Returns the transcript text between two timestamps. The model picks the start and end, so it controls the span; widen it for more context, or ask for an asymmetric window like the run-up to a moment. |
+| `load_video(url)` | Fetches the video's transcript (see below) plus its metadata (title, description) into a shared, cached store. Returns only orientation — title, description, and the covered time span — *not* the transcript itself, so a long video doesn't flood the context window; the model reads the transcript in slices via `get_transcript_range`. Auto-called on the initial URL. |
+| `get_transcript_range(start_timestamp, end_timestamp)` | Returns the transcript text between two timestamps, sliced from the cached transcript — this is how transcript text actually enters the conversation. The model picks the start and end, so it controls the span; widen it for more context, or ask for an asymmetric window like the run-up to a moment. |
 | `get_frames(timestamps)` | Extracts a frame at each requested timestamp (via ffmpeg) and returns them as images for the model to look at. The model picks the exact timestamps, so it controls granularity — spread them out to track change over time, or cluster them on one moment. |
 
-### Transcripts: captions-first, ASR fallback
+### Transcripts: from the video's captions
 
-`load_video` tries the video's existing captions first (via yt-dlp) — they're instant. If captions are missing or low quality, it falls back to transcribing the audio itself with a Whisper-class model. This keeps loading fast in the common case while staying robust when captions don't exist.
+`load_video` pulls the video's existing captions via yt-dlp — manual or YouTube's automatic ones — which are instant, so there's no separate transcription step.
 
 ## Architecture
 
@@ -54,7 +54,6 @@ The payoff: swapping the bare-bones console interface for a richer Ink UI is a s
 - **Anthropic API** — the model behind the loop.
 - **yt-dlp** — caption/transcript download.
 - **ffmpeg** — frame extraction.
-- **whisper.cpp** (or a hosted ASR endpoint) — transcript fallback when captions are unavailable.
 - **Ink** — terminal UI layer (added after the loop is solid).
 
 ## Status & roadmap
@@ -62,8 +61,8 @@ The payoff: swapping the bare-bones console interface for a richer Ink UI is a s
 Early development. The intended build order:
 
 - [x] Agent loop working behind a plain console interface (`readline` in, `console.log` out)
-- [ ] `ToolRegistry` with the three tools — `load_video` + `get_frames` done; `get_transcript_range` pending
-- [ ] `load_video` with captions-first / ASR-fallback transcript handling — captions-first done; ASR fallback pending
+- [x] `ToolRegistry` with the three tools — `load_video`, `get_transcript_range`, and `get_frames` all done
+- [x] `load_video` transcript handling — captions via yt-dlp
 - [x] Multimodal frame results fed back into the loop
 - [ ] Tool-permission prompts through the `Host` port
 - [ ] Ink rendering layer swapped in on top
@@ -81,4 +80,4 @@ bun install
 bun src/index.ts <youtube-url>
 ```
 
-It loads the transcript up front, then you ask questions referencing timestamps as you watch. Type `/exit` to quit.
+It loads the video up front (transcript + metadata), then you ask questions referencing timestamps as you watch. Type `/exit` to quit.
