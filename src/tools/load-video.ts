@@ -1,17 +1,17 @@
 import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
-import type { TranscriptStore } from "./transcript.ts";
+import type { VideoStore } from "./video.ts";
 
 // Cap how much of the (sometimes enormous) YouTube description we surface. The top of a description
 // is usually the real summary; the tail is links, sponsors, and hashtags — noise we don't want
 // eating the context we just worked to keep lean.
 const MAX_DESCRIPTION_CHARS = 1000;
 
-// The load_video tool: fetch the video's transcript into the shared store, but deliberately DON'T
-// return the transcript itself — that would bloat the context for the whole session. Instead it
-// returns light orientation (title, description, covered time span) and points the model at
-// get_transcript_range to read specific sections on demand.
-export function createLoadVideoTool(transcriptStore: TranscriptStore): Tool {
+// The load_video tool: load the video (metadata + transcript) into the shared store, but
+// deliberately DON'T return the transcript itself — that would bloat the context for the whole
+// session. Instead it returns light orientation (title, description, covered time span) and points
+// the model at get_transcript_range to read specific sections on demand.
+export function createLoadVideoTool(videoStore: VideoStore): Tool {
 	return {
 		schema: {
 			name: "load_video",
@@ -21,16 +21,16 @@ export function createLoadVideoTool(transcriptStore: TranscriptStore): Tool {
 		},
 
 		async run() {
-			const transcript = await transcriptStore.load();
-			if (!transcript.ok) return transcript.message;
+			const video = await videoStore.load();
+			if (!video.ok) return video.message;
 
-			const { title, description } = transcript.metadata;
-			const first = transcript.entries[0];
-			const last = transcript.entries[transcript.entries.length - 1];
+			const { title, description } = video.metadata;
+			const first = video.transcriptEntries[0];
+			const last = video.transcriptEntries[video.transcriptEntries.length - 1];
 
 			// Report the covered span so the model knows the valid range for get_transcript_range,
-			// without pulling any transcript text into the conversation. entries is non-empty on
-			// success, so first/last are only optional to satisfy noUncheckedIndexedAccess; the empty
+			// without pulling any transcript text into the conversation. transcriptEntries is non-empty
+			// on success, so first/last are only optional to satisfy noUncheckedIndexedAccess; the empty
 			// span carries its own leading space so concatenation stays clean either way.
 			const span =
 				first && last

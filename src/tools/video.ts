@@ -16,29 +16,30 @@ export type VideoMetadata = { title: string; description: string };
 // The outcome of loading a video. On success: its metadata plus the parsed transcript lines. On
 // failure: a plain-English message explaining why (fetch failed, no captions) — the message the
 // model relays.
-export type LoadedTranscript =
-	| { ok: true; metadata: VideoMetadata; entries: TranscriptEntry[] }
+export type LoadedVideo =
+	| { ok: true; metadata: VideoMetadata; transcriptEntries: TranscriptEntry[] }
 	| { ok: false; message: string };
 
-// A lazily-loaded, cached transcript for one video. load_video and get_transcript_range share a
-// single store so the captions are fetched at most once per session instead of once per tool call.
-export type TranscriptStore = {
-	load(): Promise<LoadedTranscript>;
+// A lazily-loaded, cached video (metadata + transcript) for one URL. load_video and
+// get_transcript_range share a single store so it's fetched at most once per session instead of
+// once per tool call.
+export type VideoStore = {
+	load(): Promise<LoadedVideo>;
 };
 
-export function createTranscriptStore(videoUrl: string): TranscriptStore {
+export function createVideoStore(videoUrl: string): VideoStore {
 	// Hold the in-flight/resolved promise (not the value) so concurrent callers share one fetch.
-	let cached: Promise<LoadedTranscript> | undefined;
+	let cached: Promise<LoadedVideo> | undefined;
 
 	return {
 		load() {
 			if (cached) return cached;
 
-			const pending = fetchTranscript(videoUrl);
+			const pending = fetchVideo(videoUrl);
 			cached = pending;
 
 			// Don't let a transient failure wedge the whole session: if the load didn't succeed, drop it
-			// from the cache so the next call retries. (fetchTranscript never rejects, so no catch here.)
+			// from the cache so the next call retries. (fetchVideo never rejects, so no catch here.)
 			pending.then((result) => {
 				if (!result.ok && cached === pending) cached = undefined;
 			});
@@ -53,11 +54,11 @@ export function formatTranscript(entries: TranscriptEntry[]): string {
 	return entries.map((entry) => `[${formatTimestamp(entry.start)}] ${entry.text}`).join("\n");
 }
 
-// Download captions for `videoUrl` into a fresh temp dir, then parse them. Captions-first — we take
-// the video's existing captions (manual or YouTube's automatic ones), which are instant.
+// Download a video's captions and metadata into a fresh temp dir, then parse them. Captions-first —
+// we take the video's existing captions (manual or YouTube's automatic ones), which are instant.
 // Transcribing the audio ourselves when none exist is a later step. Never rejects: any failure comes
 // back as { ok: false, message } so the tool has something to relay instead of crashing the loop.
-async function fetchTranscript(videoUrl: string): Promise<LoadedTranscript> {
+async function fetchVideo(videoUrl: string): Promise<LoadedVideo> {
 	let dir: string | undefined;
 
 	try {
@@ -121,10 +122,10 @@ async function fetchTranscript(videoUrl: string): Promise<LoadedTranscript> {
 			};
 		}
 
-		return { ok: true, metadata: await readVideoMetadata(dir), entries };
+		return { ok: true, metadata: await readVideoMetadata(dir), transcriptEntries: entries };
 	} catch (error) {
 		const detail = error instanceof Error ? error.message : String(error);
-		return { ok: false, message: `Couldn't load the video's transcript: ${detail}` };
+		return { ok: false, message: `Couldn't load the video: ${detail}` };
 	} finally {
 		// Always clean up the temp dir, even if a step above threw.
 		if (dir) await rm(dir, { recursive: true, force: true });
