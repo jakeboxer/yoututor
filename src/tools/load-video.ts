@@ -1,21 +1,32 @@
+import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
-import { formatTranscript, type TranscriptStore } from "./transcript.ts";
+import type { TranscriptStore } from "./transcript.ts";
 
-// The load_video tool: return the video's timestamped transcript. The fetch/parse lives in the
-// shared transcript store (see transcript.ts) so load_video and get_transcript_range read the same
-// captions, loaded at most once per session.
+// The load_video tool: fetch the video's transcript into the shared store, but deliberately DON'T
+// return it. Dumping a long transcript into the conversation would bloat the context for the whole
+// session, so we just confirm the load; the model reads what it needs via get_transcript_range.
 export function createLoadVideoTool(transcript: TranscriptStore): Tool {
 	return {
 		schema: {
 			name: "load_video",
 			description:
-				"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Returns the timestamped transcript.",
+				"Load a YouTube video's transcript so you can answer questions grounded in what the video actually says. Call this before answering questions about the video's content. Loads the transcript into the session and confirms it's ready — read specific parts with get_transcript_range.",
 			input_schema: { type: "object" },
 		},
 
 		async run() {
 			const loaded = await transcript.load();
-			return loaded.ok ? formatTranscript(loaded.entries) : loaded.message;
+			if (!loaded.ok) return loaded.message;
+
+			// Report the covered time span so the model knows the valid range for get_transcript_range,
+			// without pulling any transcript text into the conversation. entries is non-empty on success.
+			const first = loaded.entries[0];
+			const last = loaded.entries[loaded.entries.length - 1];
+			const span =
+				first && last
+					? ` It covers ${formatTimestamp(first.start)} to ${formatTimestamp(last.start)}.`
+					: "";
+			return `Transcript loaded.${span} Use get_transcript_range to read specific sections.`;
 		},
 	};
 }
