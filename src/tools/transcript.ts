@@ -9,10 +9,15 @@ import { formatTimestamp } from "./timestamp.ts";
 // callers can compare and slice by time; formatting back to [mm:ss] happens at the edge.
 export type TranscriptEntry = { start: number; text: string };
 
-// The outcome of loading a video's transcript. Either the parsed lines, or a plain-English message
-// explaining why there aren't any (fetch failed, no captions) — the same message the model relays.
+// The video's basic metadata, pulled from yt-dlp's info JSON alongside the captions. Cheap
+// orientation for the model — what the video is — without any transcript text in the conversation.
+export type VideoMetadata = { title: string; description: string };
+
+// The outcome of loading a video. On success: its metadata plus the parsed transcript lines. On
+// failure: a plain-English message explaining why (fetch failed, no captions) — the message the
+// model relays.
 export type LoadedTranscript =
-	| { ok: true; entries: TranscriptEntry[] }
+	| { ok: true; metadata: VideoMetadata; entries: TranscriptEntry[] }
 	| { ok: false; message: string };
 
 // A lazily-loaded, cached transcript for one video. load_video and get_transcript_range share a
@@ -65,6 +70,7 @@ async function fetchTranscript(videoUrl: string): Promise<LoadedTranscript> {
 			"--skip-download", // we only want the captions, not the video
 			"--write-subs", // manually-uploaded captions, if any
 			"--write-auto-subs", // YouTube's auto-generated captions as a fallback
+			"--write-info-json", // the video's metadata (title, description, …) as <id>.info.json
 			"--sub-langs",
 			// Prefer the original English track, then common variants. Deliberately NOT "en.*" — that
 			// also matches the many "English from <language>" auto-translation tracks, and yt-dlp
@@ -115,13 +121,35 @@ async function fetchTranscript(videoUrl: string): Promise<LoadedTranscript> {
 			};
 		}
 
-		return { ok: true, entries };
+		return { ok: true, metadata: await readVideoMetadata(dir), entries };
 	} catch (error) {
 		const detail = error instanceof Error ? error.message : String(error);
 		return { ok: false, message: `Couldn't load the video's transcript: ${detail}` };
 	} finally {
 		// Always clean up the temp dir, even if a step above threw.
 		if (dir) await rm(dir, { recursive: true, force: true });
+	}
+}
+
+// Read the video's metadata from the <id>.info.json that yt-dlp wrote next to the captions.
+// Best-effort: metadata is orientation, not essential, so any problem (missing/unreadable/malformed
+// file, or a field that isn't a string) degrades to empty strings rather than failing the load.
+async function readVideoMetadata(dir: string): Promise<VideoMetadata> {
+	try {
+		let infoPath: string | undefined;
+		for await (const name of new Glob("*.info.json").scan(dir)) {
+			infoPath = join(dir, name);
+			break;
+		}
+		if (!infoPath) return { title: "", description: "" };
+
+		const info = JSON.parse(await Bun.file(infoPath).text());
+		return {
+			title: typeof info.title === "string" ? info.title : "",
+			description: typeof info.description === "string" ? info.description : "",
+		};
+	} catch {
+		return { title: "", description: "" };
 	}
 }
 
