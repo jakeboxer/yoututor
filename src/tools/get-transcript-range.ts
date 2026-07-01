@@ -1,7 +1,13 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { parseTimestamp, TIMESTAMP_DESCRIPTION, TIMESTAMP_PATTERN } from "./timestamp.ts";
+import {
+	formatTimestamp,
+	parseTimestamp,
+	TIMESTAMP_DESCRIPTION,
+	TIMESTAMP_PATTERN,
+} from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
+import { formatTranscript, type TranscriptStore } from "./transcript.ts";
 
 const Input = z
 	.object({
@@ -29,7 +35,7 @@ const Input = z
 		path: ["end_timestamp"],
 	});
 
-export function createGetTranscriptRangeTool(videoUrl: string): Tool {
+export function createGetTranscriptRangeTool(transcript: TranscriptStore): Tool {
 	return {
 		schema: {
 			name: "get_transcript_range",
@@ -47,7 +53,29 @@ export function createGetTranscriptRangeTool(videoUrl: string): Tool {
 				return `get_transcript_range couldn't read its input: ${z.prettifyError(parsed.error)}`;
 			}
 
-			return `TODO (${videoUrl})`;
+			const loaded = await transcript.load();
+			if (!loaded.ok) return loaded.message;
+
+			const start = parseTimestamp(parsed.data.start_timestamp);
+			const end = parseTimestamp(parsed.data.end_timestamp);
+
+			// Inclusive on both ends, keyed by each line's start time — the semantics the field
+			// descriptions promise the model ("at or after" start, "up to" end).
+			const inRange = loaded.entries.filter((entry) => entry.start >= start && entry.start <= end);
+
+			if (inRange.length === 0) {
+				// Point the model at the transcript's actual bounds so it can widen its range next turn
+				// instead of guessing again. entries is non-empty whenever load() succeeds.
+				const first = loaded.entries[0];
+				const last = loaded.entries[loaded.entries.length - 1];
+				const span =
+					first && last
+						? ` The transcript runs from ${formatTimestamp(first.start)} to ${formatTimestamp(last.start)}.`
+						: "";
+				return `No transcript lines fall between ${parsed.data.start_timestamp} and ${parsed.data.end_timestamp}.${span}`;
+			}
+
+			return formatTranscript(inRange);
 		},
 	};
 }
