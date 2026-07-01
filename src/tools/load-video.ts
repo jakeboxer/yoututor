@@ -16,7 +16,10 @@ export function createLoadVideoTool(videoStore: VideoStore): Tool {
 		schema: {
 			name: "load_video",
 			description:
-				"Load a YouTube video so you can answer questions grounded in what it actually says. Call this before answering questions about the video's content. Returns the video's title, description, and the time span its transcript covers — but NOT the transcript text itself. Read specific sections on demand with get_transcript_range.",
+				"Load a YouTube video so you can answer questions grounded in what it actually says. " +
+				"Call this before answering questions about the video's content. Returns the video's " +
+				"title, description, and the time span its transcript covers — but NOT the transcript " +
+				"text itself. Read specific sections on demand with get_transcript_range.",
 			input_schema: { type: "object" },
 		},
 
@@ -46,8 +49,8 @@ export function createLoadVideoTool(videoStore: VideoStore): Tool {
 	};
 }
 
-// Trim a description down to MAX_DESCRIPTION_CHARS, cutting at a word/line boundary so we don't slice
-// through the middle of a word. Returns "" for an empty/whitespace-only description.
+// Trim a description down to MAX_DESCRIPTION_CHARS, cutting at a word/line boundary so we don't
+// slice through the middle of a word. Returns "" for an empty/whitespace-only description.
 function truncateDescription(text: string): string {
 	const trimmed = text.trim();
 	if (trimmed.length <= MAX_DESCRIPTION_CHARS) return trimmed;

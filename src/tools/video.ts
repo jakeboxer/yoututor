@@ -90,10 +90,10 @@ async function fetchVideo(videoUrl: string): Promise<LoadedVideo> {
 		const result = await $`yt-dlp ${args}`.quiet().nothrow();
 
 		if (result.exitCode !== 0) {
-			const stderr = result.stderr.toString().trim();
+			const err = tail(result.stderr.toString().trim());
 			return {
 				ok: false,
-				message: `Couldn't load the video — yt-dlp exited with code ${result.exitCode}:\n${tail(stderr)}`,
+				message: `Couldn't load the video — yt-dlp exited with code ${result.exitCode}:\n${err}`,
 			};
 		}
 
@@ -109,7 +109,8 @@ async function fetchVideo(videoUrl: string): Promise<LoadedVideo> {
 			return {
 				ok: false,
 				message:
-					"This video has no English captions available. (Transcribing the audio directly isn't wired up yet.)",
+					"This video has no English captions available. " +
+					"(Transcribing the audio directly isn't wired up yet.)",
 			};
 		}
 
