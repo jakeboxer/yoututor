@@ -155,36 +155,50 @@ async function readVideoMetadata(dir: string): Promise<VideoMetadata> {
 	}
 }
 
-// Turn an SRT file into transcript entries. SRT blocks are separated by blank lines and look like:
+// Turn an SRT file into transcript entries. An SRT block looks like:
 //   1
 //   00:00:18,800 --> 00:00:25,960
 //   We're no strangers to
 // We keep the start time and the text, and drop the index and end time.
 export function parseSrt(srt: string): TranscriptEntry[] {
 	const entries: TranscriptEntry[] = [];
-	const blocks = srt
-		.replace(/\r\n/g, "\n")
-		.trim()
-		.split(/\n{2,}/);
+	const lines = srt.replace(/\r\n/g, "\n").split("\n");
 
-	for (const block of blocks) {
-		const rows = block.split("\n");
-		const timing = rows[1];
-		if (!timing) continue;
+	// SRT uses a comma before milliseconds; some variants use a period. We keep only HH:MM:SS.
+	const timingRe = /^(\d{2}):(\d{2}):(\d{2})[,.]\d{3}\s*-->/;
+	const indexRe = /^\d+$/;
 
-		// Pull HH:MM:SS off the start timestamp (SRT uses a comma before milliseconds, which we ignore).
-		const match = timing.match(/^(\d{2}):(\d{2}):(\d{2})[,.]\d{3}\s*-->/);
-		if (!match) continue;
+	let start: number | undefined;
+	let textLines: string[] = [];
 
-		const start = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
-		if (Number.isNaN(start)) continue;
+	const flush = () => {
+		if (start === undefined) return;
 
-		// Everything after the timestamp line is caption text; join wrapped lines with a space.
-		const text = rows.slice(2).join(" ").trim();
-		if (!text) continue;
+		// Join wrapped and blank-separated lines with spaces, then collapse the runs to single spaces.
+		const text = textLines.join(" ").replace(/\s+/g, " ").trim();
+		if (text) entries.push({ start, text });
+	};
 
-		entries.push({ start, text });
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i] ?? "";
+		const next = lines[i + 1];
+		const timing = next !== undefined && indexRe.test(line.trim()) ? next.match(timingRe) : null;
+
+		if (timing) {
+			flush();
+			start = Number(timing[1]) * 3600 + Number(timing[2]) * 60 + Number(timing[3]);
+			textLines = [];
+			i++; // consume the timing line along with the index line
+
+			continue;
+		}
+
+		if (start !== undefined) {
+			textLines.push(line);
+		}
 	}
+
+	flush();
 
 	return entries;
 }
