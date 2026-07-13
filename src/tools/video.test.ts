@@ -77,6 +77,15 @@ ${subtitle1}
 
 test("parseSrt: subtitle with extra text and no newline before its number", () => {
 	const srt = `
+extra text
+${subtitle1}
+  `.trim();
+
+	expect(parseSrt(srt)).toEqual([entry1]);
+});
+
+test("parseSrt: a subtitle with no text followed by a valid subtitle", () => {
+	const srt = `
 1
 00:05:00,400 --> 00:05:15,300
 
@@ -84,4 +93,14 @@ ${subtitle2}
   `.trim();
 
 	expect(parseSrt(srt)).toEqual([entry2]);
+});
+
+test("parseSrt: subtitle with no timing info", () => {
+	const srt = `
+1
+This is an example of
+a subtitle.
+  `.trim();
+
+	expect(parseSrt(srt)).toBeEmpty();
 });
