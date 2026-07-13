@@ -160,7 +160,7 @@ async function readVideoMetadata(dir: string): Promise<VideoMetadata> {
 //   00:00:18,800 --> 00:00:25,960
 //   We're no strangers to
 // We keep the start time and the text, and drop the index and end time.
-function parseSrt(srt: string): TranscriptEntry[] {
+export function parseSrt(srt: string): TranscriptEntry[] {
 	const entries: TranscriptEntry[] = [];
 	const blocks = srt
 		.replace(/\r\n/g, "\n")
