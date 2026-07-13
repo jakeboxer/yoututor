@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { selectTranscriptRange } from "./get-transcript-range.ts";
+import { createGetTranscriptRangeTool, selectTranscriptRange } from "./get-transcript-range.ts";
 
 const entry1 = {
 	start: 0,
@@ -10,6 +10,23 @@ const entry2 = {
 	text: "You know the rules, and so do I.",
 };
 const allEntries = [entry1, entry2];
+
+const transcript1 = "[00:00] We're no strangers to love.";
+const transcript2 = "[00:10] You know the rules, and so do I.";
+const fullTranscript = `${transcript1}\n${transcript2}`;
+
+const mockGetTranscriptRangeTool = createGetTranscriptRangeTool({
+	load() {
+		return Promise.resolve({
+			ok: true,
+			metadata: {
+				title: "Never Gonna Give You Up",
+				description: "The official video by Rick Astley.",
+			},
+			transcriptEntries: [entry1, entry2],
+		});
+	},
+});
 
 test("selectTranscriptRange: just start of video", () => {
 	expect(selectTranscriptRange(allEntries, 0, 0)).toEqual([entry1]);
@@ -49,4 +66,61 @@ test("selectTranscriptRange: from entry 2 start to entry 2 middle", () => {
 
 test("selectTranscriptRange: spanning middle of entry 1", () => {
 	expect(selectTranscriptRange(allEntries, 1, 8)).toBeEmpty();
+});
+
+test("get_transcript_range tool: start to end", async () => {
+	const actual = await mockGetTranscriptRangeTool.run({
+		start_timestamp: "0:00",
+		end_timestamp: "0:15",
+	});
+
+	expect(actual).toEqual(fullTranscript);
+});
+
+test("get_transcript_range tool: middle to later middle", async () => {
+	const actual = await mockGetTranscriptRangeTool.run({
+		start_timestamp: "0:08",
+		end_timestamp: "0:12",
+	});
+
+	expect(actual).toEqual(transcript2);
+});
+
+test("get_transcript_range tool: gap between entries", async () => {
+	const actual = await mockGetTranscriptRangeTool.run({
+		start_timestamp: "0:04",
+		end_timestamp: "0:08",
+	});
+
+	expect(actual).toEqual(
+		"No transcript lines fall between 0:04 and 0:08. The transcript runs from 00:00 to 00:10.",
+	);
+});
+
+test("get_transcript_range tool: bad input", async () => {
+	const actual = await mockGetTranscriptRangeTool.run({
+		start_timestamp: "0:02",
+		end_timestamp: "0:01",
+	});
+
+	expect(actual).toContain("get_transcript_range couldn't read its input");
+	expect(actual).toContain("end_timestamp must be at or after start_timestamp");
+});
+
+test("get_transcript_range tool: video failed to load", async () => {
+	const errorMessage = "Video failed to load.";
+	const failingGetTranscriptRangeTool = createGetTranscriptRangeTool({
+		load() {
+			return Promise.resolve({
+				ok: false,
+				message: errorMessage,
+			});
+		},
+	});
+	const actual = await failingGetTranscriptRangeTool.run({
+		start_timestamp: "0:00",
+		end_timestamp: "0:15",
+	});
+
+	expect(actual).toEqual(errorMessage);
 });
