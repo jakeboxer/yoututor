@@ -7,7 +7,7 @@ import {
 	TIMESTAMP_PATTERN,
 } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
-import { formatTranscript, type VideoStore } from "./video.ts";
+import { formatTranscript, type TranscriptEntry, type VideoStore } from "./video.ts";
 
 const Input = z
 	.object({
@@ -35,6 +35,17 @@ const Input = z
 		path: ["end_timestamp"],
 	});
 
+// Which transcript entries fall in [start, end], inclusive on both ends. Keyed on each entry's
+// START time only: a caption that begins before `start` is excluded even if its text runs into the
+// window (we don't store caption end times). Extracted from run() so the pure logic is unit-testable.
+export function selectTranscriptRange(
+	entries: TranscriptEntry[],
+	start: number,
+	end: number,
+): TranscriptEntry[] {
+	return entries.filter((entry) => entry.start >= start && entry.start <= end);
+}
+
 export function createGetTranscriptRangeTool(videoStore: VideoStore): Tool {
 	return {
 		schema: {
@@ -61,9 +72,7 @@ export function createGetTranscriptRangeTool(videoStore: VideoStore): Tool {
 
 			// Inclusive on both ends, keyed by each line's start time — the semantics the field
 			// descriptions promise the model ("at or after" start, "up to" end).
-			const inRange = video.transcriptEntries.filter(
-				(entry) => entry.start >= start && entry.start <= end,
-			);
+			const inRange = selectTranscriptRange(video.transcriptEntries, start, end);
 
 			if (inRange.length === 0) {
 				// Point the model at the transcript's actual bounds so it can widen its range next turn
