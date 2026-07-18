@@ -26,7 +26,7 @@ React is a real dependency (Ink is a React *renderer*); `@types/react` is dev-on
 Create `src/console/ink-smoke.tsx`: the smallest possible Ink program — `render()` + one `<Text>` — run with `bun src/console/ink-smoke.tsx`.
 **Checkpoint:** styled text appears and the process exits cleanly. Isolates toolchain problems (Bun + Ink + JSX) from integration problems.
 
-### [ ] Step 3 — Make the `Renderer` port explicit
+### [x] Step 3 — Make the `Renderer` port explicit (done 2026-07-17)
 Create `src/console/renderer.ts` with `type Renderer = { handle(event: AgentEvent): void }`; update `ConsoleRenderer` to `implements Renderer`.
 Conventions: `type` over `interface`, one port per file, `.ts` import extensions, `import type` for the event type.
 **Checkpoint:** typecheck + lint pass.
