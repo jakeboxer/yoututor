@@ -1,6 +1,5 @@
 import Agent from "./agent/agent.ts";
-import { consoleHost } from "./console/console-host.ts";
-import { ConsoleRenderer } from "./console/console-renderer.ts";
+import { InkApp } from "./console/ink-app.tsx";
 import { createToolRegistry } from "./tools/registry.ts";
 
 // The YouTube URL to tutor on is required as the first CLI argument.
@@ -12,8 +11,17 @@ if (!videoUrl) {
 
 console.log(`Tutoring on: ${videoUrl}`);
 
+const host = new InkApp();
+const renderer = host;
+
+// Uncomment this to use the bare console host/renderer instead of Ink.
+// const host = consoleHost;
+// const renderer = new ConsoleRenderer();
+
 // Drive the agent, handing each event to the renderer as it arrives.
-const renderer = new ConsoleRenderer();
-for await (const event of new Agent(consoleHost, createToolRegistry(videoUrl), videoUrl).run()) {
+for await (const event of new Agent(host, createToolRegistry(videoUrl), videoUrl).run()) {
 	renderer.handle(event);
 }
+
+// Give back the control that Ink's raw-mode stdin subscription takes.
+host.unmount();
