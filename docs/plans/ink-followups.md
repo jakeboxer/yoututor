@@ -33,6 +33,8 @@ Submitting an empty input echoes a bare `> ` line into the log before the agent 
 
 The console layer has no tests; the Ink layer could get them via `ink-testing-library` (new dev dependency): mount `AppView` / drive `InkApp.handle()` with synthetic `AgentEvent`s and assert on the rendered frames, plus the `requestInput()` promise-bridge behavior. Worth doing before the UI grows much — the imperative `rerender()` driver makes `InkApp` easy to drive synthetically.
 
+Do this refactor as part of the test work: `InkApp`'s constructor currently calls `render()`, i.e. constructing the object paints the terminal (claims stdout, patches `console`). The lifecycle itself is fine — the object *is* the live UI session, and two-phase `new` + `mount()` would be worse (nullable `ink` field, "constructed but not mounted" state everywhere). But name the side effect and create a test seam: make the constructor private and trivial, expose a static factory (`InkApp.mount()`) so the call site in `index.ts` announces the paint, and let the factory/constructor accept the render function (or Ink `Instance`) as a parameter so tests can inject `ink-testing-library`'s fake instead of real stdout.
+
 ## Someday / open questions
 
 - **Hooks-driven state**: `InkApp`'s imperative mutate-then-`rerender()` driver was chosen as the minimal proof surface. If the UI grows real interactivity (scrolling, focus, multiple panes), consider inverting: state lives in the component (`useState`/`useReducer`), and `InkApp` shrinks to an event-forwarding shell. Don't do this preemptively — the imperative driver is simpler while the component stays a pure projection.
