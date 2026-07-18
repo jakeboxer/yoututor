@@ -38,7 +38,7 @@ Create `src/console/ink-app.tsx`:
 - An `unmount()` method delegating to Ink's, for clean process exit.
 **Checkpoint:** typecheck + lint pass.
 
-### [ ] Step 5 — Input side: `InkApp` implements `Host`
+### [x] Step 5 — Input side: `InkApp` implements `Host` (done 2026-07-17; `awaitingInput` derived from resolver instead of a flag)
 Extend the same file so `InkApp implements Renderer, Host`:
 - **Promise bridge:** `requestInput()` creates a `Promise<string | null>`, stashes its `resolve` on the instance, flips an `awaitingInput` flag, rerenders. On submit, the class records `> text` as a log line, clears the flag, rerenders, resolves. The awaiting agent loop wakes with the input — no loop changes.
 - **Component:** when `awaitingInput`, render `ink-text-input`'s `<TextInput>` behind a `> ` prompt. The input value is the component's only `useState`; `onSubmit` calls a callback prop and clears the field. (React preserves this state across `rerender()` since component identity is stable.)
