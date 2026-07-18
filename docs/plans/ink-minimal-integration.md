@@ -22,7 +22,7 @@ Run `bun add ink react ink-text-input` and `bun add -d @types/react`.
 React is a real dependency (Ink is a React *renderer*); `@types/react` is dev-only (types, no runtime); `ink-text-input` is the smallest path to Ink-owned input.
 **Checkpoint:** `bun run typecheck` still passes.
 
-### [ ] Step 2 — Standalone smoke test (throwaway file)
+### [x] Step 2 — Standalone smoke test (throwaway file) (done 2026-07-17)
 Create `src/console/ink-smoke.tsx`: the smallest possible Ink program — `render()` + one `<Text>` — run with `bun src/console/ink-smoke.tsx`.
 **Checkpoint:** styled text appears and the process exits cleanly. Isolates toolchain problems (Bun + Ink + JSX) from integration problems.
 
