@@ -3,6 +3,7 @@
 	"editor.codeActionsOnSave": {
 		"source.organizeImports.biome": "explicit"
 	},
+	"editor.rulers": [100],
 	"[typescript]": {
 		"editor.rulers": [100],
 		"editor.defaultFormatter": "biomejs.biome"

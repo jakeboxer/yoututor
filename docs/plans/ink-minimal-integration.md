@@ -31,7 +31,7 @@ Create `src/console/renderer.ts` with `type Renderer = { handle(event: AgentEven
 Conventions: `type` over `interface`, one port per file, `.ts` import extensions, `import type` for the event type.
 **Checkpoint:** typecheck + lint pass.
 
-### [ ] Step 4 — The Ink app, output side first
+### [x] Step 4 — The Ink app, output side first (done 2026-07-17)
 Create `src/console/ink-app.tsx`:
 - A small presentational component taking completed `lines: string[]` plus in-progress `current: string`, rendering a `<Box flexDirection="column">` of `<Text>` lines.
 - An `InkApp` class `implements Renderer` holding plain mutable state (`lines`, `current`); `render()` once in the constructor, `rerender()` with fresh props in `handle(event)`. Event mapping mirrors `ConsoleRenderer`: `textDelta` appends to `current`; `modelResponded` promotes `current` to a completed line; `toolRunStarted`/`toolRunFinished` append `⚙ name` / `✓ name` lines.
