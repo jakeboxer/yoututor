@@ -2,7 +2,7 @@
 
 > **Working mode:** This is a guided walkthrough — Jake writes every line of code; Claude explains what to write and why, reviews the result, and runs read-only checks (`bun run typecheck`, `bun run lint`) at each checkpoint. (This plan file itself is the one sanctioned exception.)
 >
-> **Status:** in progress, started 2026-07-17. Check off steps as they complete.
+> **Status:** ✅ complete (2026-07-17 → 2026-07-18). All 8 steps done and verified end-to-end.
 
 ## Context
 
@@ -45,13 +45,13 @@ Extend the same file so `InkApp implements Renderer, Host`:
 - **Exit paths:** `/exit` ends the loop agent-side; Ink's default Ctrl+C covers hard exit. Ctrl+D → `null` (EOF parity with `consoleHost`) via `useInput` is optional — decide in the moment.
 **Checkpoint:** typecheck + lint pass.
 
-### [ ] Step 6 — Wire it in
+### [x] Step 6 — Wire it in (done 2026-07-17; console host/renderer left as commented-out swap block in index.ts)
 Edit `src/index.ts`: construct one `InkApp`, pass it as **both** the `Host` (to `new Agent(...)`) and the renderer in the `for await` loop, replacing `consoleHost` and `ConsoleRenderer` (both files stay as the fallback). Call `app.unmount()` after the loop.
 
-### [ ] Step 7 — Prove it end-to-end
+### [x] Step 7 — Prove it end-to-end (done 2026-07-18; full session verified, TextInput-inside-Text nesting works)
 Run `bun src/index.ts <some-youtube-url>`: seeded `load_video` tool lines → greeting streams in → text field appears → a question round-trips (tool lines, streamed answer) → submitted input echoed into the log → `/exit` ends with a clean terminal. Ink owns stdout and stdin, so no prompt-glitch caveat.
 
-### [ ] Step 8 — Cleanup
+### [x] Step 8 — Cleanup (done 2026-07-18; typecheck + lint + 42 tests all pass)
 Delete `src/console/ink-smoke.tsx`. Final `bun run typecheck` / `bun run lint` / `bun test`.
 
 ## Files touched
