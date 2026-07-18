@@ -61,6 +61,7 @@ export class InkApp implements Renderer, Host {
 			case "textDelta":
 				this.current += event.text;
 				break;
+
 			// Reply finished: push the streamed line to the list of previous lines so the next output (a
 			// tool line or the input prompt) starts fresh. No-op when the reply had no text (e.g a pure
 			// tool call).
@@ -74,10 +75,12 @@ export class InkApp implements Renderer, Host {
 				this.current = "";
 				break;
 			}
+
 			// The event carries the full input/result; the renderer chooses a compact display.
 			case "toolRunStarted":
 				this.lines.push(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
 				break;
+
 			case "toolRunFinished":
 				this.lines.push(`✓ ${event.name}`);
 				break;
