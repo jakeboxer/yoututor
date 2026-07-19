@@ -18,7 +18,28 @@ const Input = z.object({
 		),
 });
 
-export function createGetFramesTool(videoStore: VideoStore): Tool {
+// The outcome of resolving a direct video-stream URL: the URL, or a plain-English explanation of
+// why it couldn't be resolved.
+export type StreamResult = { ok: true; url: string } | { ok: false; error: string };
+
+// The outcome of extracting one frame: its JPEG bytes as base64, or a plain-English explanation of
+// why it failed. Either way tagged with the timestamp label it was asked for, so partial results
+// stay attributable.
+export type FrameResult =
+	| { ok: true; label: string; data: string }
+	| { ok: false; label: string; error: string };
+
+// The tool's two shell-outs, injectable for tests so the frame-assembly logic can run without
+// yt-dlp/ffmpeg. Real callers use the defaults below.
+export type FrameExtraction = {
+	resolveStreamUrl: (videoUrl: string) => Promise<StreamResult>;
+	extractFrame: (streamUrl: string, label: string) => Promise<FrameResult>;
+};
+
+export function createGetFramesTool(
+	videoStore: VideoStore,
+	extraction: FrameExtraction = { resolveStreamUrl, extractFrame },
+): Tool {
 	return {
 		schema: {
 			name: "get_frames",
@@ -45,12 +66,12 @@ export function createGetFramesTool(videoStore: VideoStore): Tool {
 			// Resolve a direct video-stream URL once, then seek into it per timestamp. This lets ffmpeg
 			// fetch only the bytes around each frame via HTTP range requests, instead of downloading the
 			// whole video just to grab a handful of stills.
-			const stream = await resolveStreamUrl(current.url);
+			const stream = await extraction.resolveStreamUrl(current.url);
 			if (!stream.ok) return stream.error;
 
 			// Frames are independent, so pull them concurrently.
 			const frames = await Promise.all(
-				parsed.data.timestamps.map((label) => extractFrame(stream.url, label)),
+				parsed.data.timestamps.map((label) => extraction.extractFrame(stream.url, label)),
 			);
 
 			const blocks: Exclude<ToolResult, string> = [];
@@ -84,10 +105,6 @@ export function createGetFramesTool(videoStore: VideoStore): Tool {
 		},
 	};
 }
-
-type FrameResult =
-	| { ok: true; label: string; data: string }
-	| { ok: false; label: string; error: string };
 
 // Grab a single JPEG frame at `label` from an already-resolved stream URL.
 async function extractFrame(streamUrl: string, label: string): Promise<FrameResult> {
@@ -126,10 +143,7 @@ async function extractFrame(streamUrl: string, label: string): Promise<FrameResu
 }
 
 // Resolve a direct, seekable video-stream URL for the video with yt-dlp's -g.
-// Returns the URL, or a plain-English explanation if it couldn't be resolved.
-async function resolveStreamUrl(
-	videoUrl: string,
-): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+async function resolveStreamUrl(videoUrl: string): Promise<StreamResult> {
 	// Prefer an H.264 MP4 video track (the most ffmpeg-friendly), capped at 720p to keep range
 	// fetches small. Fall back to a progressive stream, then to whatever's best.
 	// bestvideo/best each resolve to a single URL, so -g prints one line.
