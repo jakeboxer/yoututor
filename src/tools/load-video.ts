@@ -1,3 +1,5 @@
+import type Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 import type { VideoStore } from "./video.ts";
@@ -6,6 +8,17 @@ import type { VideoStore } from "./video.ts";
 // is usually the real summary; the tail is links, sponsors, and hashtags — noise we don't want
 // eating the context we just worked to keep lean.
 const MAX_DESCRIPTION_CHARS = 1000;
+
+const Input = z.object({
+	// We expect a plain z.string() instead of z.url() so that users can paste scheme-less links
+	// ("youtube.com/watch?v=…" with no "https://"). yt-dlp properly handles these, and rejects actual
+	// garbage URLs with error messages that the model will understand.
+	url: z
+		.string()
+		.describe(
+			'The YouTube URL of the video to load, e.g. "https://www.youtube.com/watch?v=dQw4w9WgXcQ".',
+		),
+});
 
 // The load_video tool: load the video (metadata + transcript) into the shared store, but
 // deliberately DON'T return the transcript itself — that would bloat the context for the whole
@@ -17,14 +30,21 @@ export function createLoadVideoTool(videoStore: VideoStore): Tool {
 			name: "load_video",
 			description:
 				"Load a YouTube video so you can answer questions grounded in what it actually says. " +
-				"Call this before answering questions about the video's content. Returns the video's " +
-				"title, description, and the time span its transcript covers — but NOT the transcript " +
-				"text itself. Read specific sections on demand with get_transcript_range.",
-			input_schema: { type: "object" },
+				"Call this when the user shares a video link, before answering questions about its " +
+				"content; calling it again with a different URL switches the session to that video. " +
+				"Returns the video's title, description, and the time span its transcript covers — but " +
+				"NOT the transcript text itself. Read specific sections on demand with " +
+				"get_transcript_range.",
+			input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"],
 		},
 
-		async run() {
-			const video = await videoStore.load();
+		async run(input) {
+			const parsed = Input.safeParse(input);
+			if (!parsed.success) {
+				return `load_video couldn't read its input: ${z.prettifyError(parsed.error)}`;
+			}
+
+			const video = await videoStore.load(parsed.data.url);
 			if (!video.ok) return video.message;
 
 			const { title, description } = video.metadata;
