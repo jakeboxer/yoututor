@@ -9,6 +9,7 @@ type AppViewProps = {
 	lines: string[];
 	current: string;
 	awaitingInput: boolean;
+	activity: string;
 	onSubmit: (text: string) => void;
 	onEof: () => void;
 	onInterrupt: () => void;
@@ -37,6 +38,7 @@ function AppView(props: AppViewProps) {
 		<>
 			<Static items={props.lines}>{(line, index) => <Text key={index}>{line}</Text>}</Static>
 			<Box flexDirection="column">
+				{!props.awaitingInput && props.current === "" && <Text>⠋ {props.activity}</Text>}
 				{props.current !== "" && <Text>{props.current}</Text>}
 				{props.awaitingInput && (
 					<Box>
@@ -58,6 +60,8 @@ function AppView(props: AppViewProps) {
 	);
 }
 
+const THINKING_LABEL = "Thinking...";
+
 export class InkApp implements Renderer, Host {
 	private ink: Instance;
 
@@ -66,6 +70,8 @@ export class InkApp implements Renderer, Host {
 
 	// Stashed when requestInput is called, resolved when the user sends input.
 	private inputResolver: ((value: string | null) => void) | null = null;
+
+	private activity = THINKING_LABEL;
 
 	constructor() {
 		// We pass exitOnCtrlC: false because we want to make Ctrl+C exit immediately.
@@ -98,10 +104,12 @@ export class InkApp implements Renderer, Host {
 
 			// The event carries the full input/result; the renderer chooses a compact display.
 			case "toolRunStarted":
+				this.activity = `Running ${event.name}`;
 				this.appendLine(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
 				break;
 
 			case "toolRunFinished":
+				this.activity = THINKING_LABEL;
 				this.appendLine(`✓ ${event.name}`);
 				break;
 		}
@@ -126,6 +134,7 @@ export class InkApp implements Renderer, Host {
 				lines={this.lines}
 				current={this.current}
 				awaitingInput={this.isAwaitingInput()}
+				activity={this.activity}
 				onSubmit={(text) => this.submitInput(text)}
 				onEof={() => this.submitEof()}
 				onInterrupt={() => this.interrupt()}
