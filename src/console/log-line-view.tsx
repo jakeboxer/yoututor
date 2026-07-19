@@ -1,4 +1,5 @@
 import { Text } from "ink";
+import { render as renderMarkdown } from "markdansi";
 
 export type LogLine = {
 	kind:
@@ -12,7 +13,7 @@ export type LogLine = {
 export default function LogLineView(props: { line: LogLine }) {
 	switch (props.line.kind) {
 		case "reply":
-			return <Text>{props.line.text}</Text>;
+			return <Text>{renderMarkdown(props.line.text, { wrap: false }).trim()}</Text>;
 		case "toolStart":
 			return <Text color="yellow">{props.line.text}</Text>;
 		case "toolDone":
