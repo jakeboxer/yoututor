@@ -6,6 +6,15 @@ import type { Host } from "../agent/host.ts";
 import type { Renderer } from "./renderer.ts";
 import Spinner from "./spinner.tsx";
 
+type LogLine = {
+	kind:
+		| "reply" // A full reply from the model.
+		| "toolStart" // The model started a tool call.
+		| "toolDone" // The model finished a tool call.
+		| "echo"; // A prompt from the user.
+	text: string;
+};
+
 type AppViewProps = {
 	lines: string[];
 	current: string;
@@ -70,7 +79,7 @@ const THINKING_LABEL = "Thinking...";
 export class InkApp implements Renderer, Host {
 	private ink: Instance;
 
-	private lines: string[] = [];
+	private lines: LogLine[] = [];
 	private current = "";
 
 	// Stashed when requestInput is called, resolved when the user sends input.
@@ -100,7 +109,7 @@ export class InkApp implements Renderer, Host {
 				const trimmedCurrent = this.current.trim();
 
 				if (trimmedCurrent !== "") {
-					this.appendLine(trimmedCurrent);
+					this.appendLine({ kind: "reply", text: trimmedCurrent });
 				}
 
 				this.current = "";
@@ -110,12 +119,15 @@ export class InkApp implements Renderer, Host {
 			// The event carries the full input/result; the renderer chooses a compact display.
 			case "toolRunStarted":
 				this.activity = `Running ${event.name}`;
-				this.appendLine(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
+				this.appendLine({
+					kind: "toolStart",
+					text: `⚙ ${event.name} ${JSON.stringify(event.input)}`,
+				});
 				break;
 
 			case "toolRunFinished":
 				this.activity = THINKING_LABEL;
-				this.appendLine(`✓ ${event.name}`);
+				this.appendLine({ kind: "toolDone", text: `✓ ${event.name}` });
 				break;
 		}
 
@@ -156,7 +168,7 @@ export class InkApp implements Renderer, Host {
 
 		const resolver = this.inputResolver;
 
-		this.appendLine(`> ${text}`);
+		this.appendLine({ kind: "echo", text: `> ${text}` });
 		this.inputResolver = null;
 		this.rerender();
 
@@ -185,7 +197,7 @@ export class InkApp implements Renderer, Host {
 		return this.inputResolver !== null;
 	}
 
-	private appendLine(line: string) {
+	private appendLine(line: LogLine) {
 		this.lines = [...this.lines, line];
 	}
 }
