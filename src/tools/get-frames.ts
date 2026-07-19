@@ -5,6 +5,7 @@ import { tail } from "./tail.ts";
 import { parseTimestamp, TIMESTAMP_DESCRIPTION, TIMESTAMP_PATTERN } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 import type { ToolResult } from "./tool-result.ts";
+import type { VideoStore } from "./video.ts";
 
 const Input = z.object({
 	timestamps: z
@@ -17,7 +18,7 @@ const Input = z.object({
 		),
 });
 
-export function createGetFramesTool(videoUrl: string): Tool {
+export function createGetFramesTool(videoStore: VideoStore): Tool {
 	return {
 		schema: {
 			name: "get_frames",
@@ -32,10 +33,19 @@ export function createGetFramesTool(videoUrl: string): Tool {
 				return `get_frames couldn't read its input: ${z.prettifyError(parsed.error)}`;
 			}
 
+			// Frames come from whichever video the store currently holds. We don't need to await the
+			// video load finishing, because we only need the URL, and we have this as soon as the video
+			// load starts.
+			const current = videoStore.current();
+
+			// If no video load has been started yet, let the model know that this tool can't be used
+			// until a videl load has been started.
+			if (!current) return "No video is loaded yet. Call load_video with a YouTube URL first.";
+
 			// Resolve a direct video-stream URL once, then seek into it per timestamp. This lets ffmpeg
 			// fetch only the bytes around each frame via HTTP range requests, instead of downloading the
 			// whole video just to grab a handful of stills.
-			const stream = await resolveStreamUrl(videoUrl);
+			const stream = await resolveStreamUrl(current.url);
 			if (!stream.ok) return stream.error;
 
 			// Frames are independent, so pull them concurrently.

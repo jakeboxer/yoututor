@@ -5,14 +5,14 @@ import { createLoadVideoTool } from "./load-video.ts";
 import type { Tool } from "./tool.ts";
 import { createVideoStore } from "./video.ts";
 
-export function createToolRegistry(videoUrl: string): ToolRegistry {
-	// load_video and get_transcript_range read the same video; share one store so it's fetched at
-	// most once per session.
-	const videoStore = createVideoStore(videoUrl);
+export function createToolRegistry(): ToolRegistry {
+	// All three tools read the same video; share one store so it's fetched at most once per URL and
+	// they always agree on which video is current.
+	const videoStore = createVideoStore();
 
 	// Every tool the agent can use. Add a capability by writing a Tool and dropping it in this list.
 	const tools: Tool[] = [
-		createGetFramesTool(videoUrl),
+		createGetFramesTool(videoStore),
 		createGetTranscriptRangeTool(videoStore),
 		createLoadVideoTool(videoStore),
 	];

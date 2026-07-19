@@ -8,21 +8,26 @@ import type { ToolRegistry } from "./tool-registry.ts";
 export default class Agent {
 	private client = new Anthropic();
 
-	// The running conversation. Each turn appends the user message and Claude's reply, so the
-	// model sees the full history on every request instead of just the latest line.
+	// The running conversation. Each turn appends the user message and Claude's reply, so the model
+	// sees the full history on every request instead of just the latest line.
 	private messages: Anthropic.MessageParam[] = [];
 
 	constructor(
 		private host: Host,
 		private toolRegistry: ToolRegistry,
-		private videoUrl: string,
+		private videoUrl?: string,
 	) {}
 
 	async *run(): AsyncGenerator<AgentEvent> {
-		// Load the video before the user says anything: we fabricate the model's first move so the
-		// transcript is already in history, then let the model react to it with an opening message.
-		yield* this.seedLoadVideo();
-		yield* this.respond();
+		// If a URL was passed, load the video before the user says anything: we fabricate the model's
+		// first move so the transcript is already in history, then let the model react to it with an
+		// opening message.
+		// If no URL was passed, start with an empty conversation. The model calls load_video itself
+		// once the user shares a link.
+		if (this.videoUrl !== undefined) {
+			yield* this.seedLoadVideo(this.videoUrl);
+			yield* this.respond();
+		}
 
 		// Outer loop: keeps prompting the user for more input.
 		while (true) {
@@ -112,16 +117,17 @@ export default class Agent {
 	// to be three messages: the first message must be `user`, and an assistant `tool_use` must be
 	// answered by a matching `tool_result` — so we play both the user and the model for the opening
 	// move, then run the tool for real.
-	private async *seedLoadVideo(): AsyncGenerator<AgentEvent> {
+	private async *seedLoadVideo(url: string): AsyncGenerator<AgentEvent> {
 		// We invent the tool call, so we invent its id too. The tool_result below points back at it.
 		const toolUseId = "seed_load_video";
-		const input = {};
+		const input = { url };
 
 		// Kickoff user message (satisfies "first message must be user") + the fabricated decision to
-		// call load_video. The URL lives in the kickoff text below. The tool itself takes no input.
+		// call load_video. The input mirrors the tool's real schema, so history shows the model a
+		// well-formed example call it can imitate later.
 		this.messages.push({
 			role: "user",
-			content: `Load this video so we can discuss it: ${this.videoUrl}`,
+			content: `Load this video so we can discuss it: ${url}`,
 		});
 		this.messages.push({
 			role: "assistant",
