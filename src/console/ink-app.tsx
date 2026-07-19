@@ -1,4 +1,4 @@
-import { Box, type Instance, render, Static, Text } from "ink";
+import { Box, type Instance, render, Static, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
@@ -10,10 +10,28 @@ type AppViewProps = {
 	current: string;
 	awaitingInput: boolean;
 	onSubmit: (text: string) => void;
+	onEof: () => void;
+	onInterrupt: () => void;
 };
 
 function AppView(props: AppViewProps) {
 	const [value, setValue] = useState("");
+
+	useInput((input, key) => {
+		if (!key.ctrl) return;
+
+		switch (input) {
+			case "c":
+				props.onInterrupt();
+				break;
+			case "d":
+				if (props.awaitingInput) {
+					props.onEof();
+				}
+
+				break;
+		}
+	});
 
 	return (
 		<>
@@ -50,7 +68,10 @@ export class InkApp implements Renderer, Host {
 	private inputResolver: ((value: string | null) => void) | null = null;
 
 	constructor() {
-		this.ink = render(this.buildView());
+		// We pass exitOnCtrlC: false because we want to make Ctrl+C exit immediately.
+		// By default, Ink handles the exit by just unmounting the UI, leaving the process stuck forever
+		// on the pending requestInput promise.
+		this.ink = render(this.buildView(), { exitOnCtrlC: false });
 	}
 
 	handle(event: AgentEvent): void {
@@ -106,6 +127,8 @@ export class InkApp implements Renderer, Host {
 				current={this.current}
 				awaitingInput={this.isAwaitingInput()}
 				onSubmit={(text) => this.submitInput(text)}
+				onEof={() => this.submitEof()}
+				onInterrupt={() => this.interrupt()}
 			/>
 		);
 	}
@@ -124,6 +147,24 @@ export class InkApp implements Renderer, Host {
 		this.rerender();
 
 		resolver(text);
+	}
+
+	private submitEof() {
+		if (this.inputResolver === null) return;
+
+		const resolver = this.inputResolver;
+		this.inputResolver = null;
+		this.rerender();
+
+		resolver(null);
+	}
+
+	private interrupt() {
+		this.unmount();
+
+		// Shell convention for "killed by Ctrl+C" (128 + SIGINT's signal number 2).
+		// With this, anything scripting around this CLI can tell "user bailed" from "exited normally".
+		process.exit(130);
 	}
 
 	private isAwaitingInput(): boolean {
