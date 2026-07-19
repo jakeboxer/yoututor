@@ -22,46 +22,46 @@ Follow-up #8 in [ink-followups.md](ink-followups.md) (deferred from #5): model r
 
 ### 2. Install markdansi (Jake runs)
 
-- [ ] `bun add markdansi` (Bun project — never npm).
+- [x] `bun add markdansi` (Bun project — never npm). *Got 0.3.2, matching the plan.*
 
 ### 3. Read markdansi's actual API before writing code (Claude guides)
 
-- [ ] Inspect the installed package's types/README (`node_modules/markdansi`) for: the `render(md, options?)` signature, the wrap/width option, theme options, and what it does with trailing newlines.
-- [ ] Decide the options object: disable markdansi's own wrapping so Ink's `<Text>` owns layout (confirm the exact option name from the types, don't guess).
+- [x] Inspect the installed package's types/README (`node_modules/markdansi`) for: the `render(md, options?)` signature, the wrap/width option, theme options, and what it does with trailing newlines.
+- [x] Decide the options object: disable markdansi's own wrapping so Ink's `<Text>` owns layout (confirm the exact option name from the types, don't guess).
+
+*Findings: signature is `render(markdown, options?): string` as hoped; the option is literally `wrap?: boolean` (default true), and `{ wrap: false }` leaves width `undefined` — no markdansi line-breaking at all. Output always ends with `\n`, and heading-first output gains a leading `\n` too, so trim both ends. The environment sniffing is markdansi's own, not chalk's: `color` defaults to `process.stdout.isTTY` — same interactive-vs-piped consequence as #7, different mechanism.*
 
 ### 4. Swap the `reply` branch (Jake writes)
 
-- [ ] In `src/console/log-line-view.tsx`: import `render` from `markdansi` (rename to something like `renderMarkdown` for clarity) and change only the `reply` case:
-  ```tsx
-  case "reply":
-  	return <Text>{renderMarkdown(props.line.text, /* options from step 3 */)}</Text>;
-  ```
-- [ ] Watch the project conventions: the `.ts`/`.tsx` extension rule doesn't apply to package imports; `verbatimModuleSyntax` means any type-only import from markdansi uses `import type`.
-- [ ] Consider trimming the rendered output (markdown renderers often append a trailing newline) — replies are already `.trim()`ed pre-push in `ink-app.tsx`, but the *rendered* string may regrow one.
-- [ ] `toolStart`/`toolDone`/`echo` branches and the streaming `current` line in `AppView` are untouched.
+- [x] In `src/console/log-line-view.tsx`: import `render` from `markdansi` (renamed `renderMarkdown`) and change only the `reply` case.
+- [x] Watch the project conventions: the `.ts`/`.tsx` extension rule doesn't apply to package imports; `verbatimModuleSyntax` means any type-only import from markdansi uses `import type`. *(Neither bit — only the value import was needed; the options literal is inferred.)*
+- [x] Consider trimming the rendered output — yes, `.trim()`: the trailing `\n` is guaranteed and heading-first output grows a leading one.
+- [x] `toolStart`/`toolDone`/`echo` branches and the streaming `current` line in `AppView` are untouched.
+
+*Deviation found at step 7: the straight one-liner (`renderMarkdown(props.line.text, { wrap: false }).trim()`) **lost blank lines between paragraphs**. markdansi deliberately renders blocks compactly — `renderChildren` concatenates block output with no separator and `RenderOptions` has no spacing knob — so the reply's paragraph structure is destroyed inside the renderer, unrecoverable by post-processing. Fix that shipped: a private `renderReply` helper in `log-line-view.tsx` splits the reply into blank-line-separated blocks (fence-aware — a ```` ``` ````/`~~~` toggle so blank lines inside code fences don't split), renders each block with `{ wrap: false }`, trims, and rejoins with `\n\n`. Accepted trade-offs, both fine for LLM replies: reference-style link definitions in a different block won't resolve; runs of blank lines collapse to one gap (standard markdown behavior anyway). Bonus: rendering a fence as its own block re-enabled markdansi's code box, which whole-string rendering (no width) had been silently skipping.*
 
 ### 5. Static checks (Claude runs, read-only)
 
-- [ ] `bun run typecheck` and `bun run lint`.
+- [x] `bun run typecheck` and `bun run lint`. *Clean on both the one-liner and the later `renderReply` version.*
 
 ### 6. Tests — the environment-dependent frame gotcha (Jake edits, Claude runs)
 
-The #7 lesson applies: chalk (inside markdansi) sniffs the **real** stdout, so interactive runs get ANSI-styled frames while piped/CI runs get plain text.
+The #7 lesson applies — via markdansi's own stdout sniffing rather than chalk (see step 3 findings): interactive runs get ANSI-styled frames while piped/CI runs get plain text.
 
-- [ ] Run `bun test src/console/ink-app.test.ts` **both ways**: interactive and `| cat`.
-- [ ] The sensitive assertion is `"modelResponded event moves the reply into the log"` (`ink-app.test.ts`) — it splits the frame on `\n` and expects an element exactly equal to `"answer"`. A plain one-word paragraph likely survives markdansi unchanged, but if styling/reflow alters it, loosen the assertion to something true in both worlds (the #7 pattern).
-- [ ] Optionally add one test: a reply containing markdown (e.g. `**bold** item`) renders without raw `**` markers — asserted in a way that holds both interactive and piped (e.g. assert the raw markers are *absent* rather than asserting specific ANSI codes).
+- [x] Run `bun test src/console/ink-app.test.ts` **both ways**: interactive and `| cat`. *(Piped run plus `script -q /dev/null bun test …` for the TTY flavor.)*
+- [x] The sensitive assertion `"modelResponded event moves the reply into the log"` survived **unchanged** in both modes: a plain one-word paragraph gets no styling from the default theme even with color on, and `.trim()` restores the exact string.
+- [x] Added two tests, both asserted in ways true in both worlds: `"reply markdown renders without raw markers"` (`**bold** item` → frame contains `bold`, not `**` — markers *absent*, no ANSI-code assertions) and `"blank line between reply paragraphs is preserved"` (`para one\n\npara two` survives verbatim — plain paragraphs are unstyled in either mode, so exact-substring holds).
 
 ### 7. End-to-end verification (Jake drives)
 
-- [ ] `bun src/index.ts <youtube url>` in **Ghostty** (not Warp — known Ink input lag), ask a question likely to produce a list or code fence.
-- [ ] Check: reply renders styled markdown; streaming text stays plain until `modelResponded` flips it into the log; `<Static>` scrollback still behaves (no full-screen rewrites); tool lines / echo lines unchanged.
+- [x] `bun src/index.ts <youtube url>` in **Ghostty** (not Warp — known Ink input lag), ask a question likely to produce a list or code fence.
+- [x] Check: reply renders styled markdown; streaming text stays plain until `modelResponded` flips it into the log; `<Static>` scrollback still behaves (no full-screen rewrites); tool lines / echo lines unchanged. *This pass caught the blank-line loss (fix folded into step 4 above); second pass confirmed paragraph gaps preserved and the boxed code fences look good (`codeBox: false` is the off switch if that ever changes).*
 
 ### 8. Wrap-up housekeeping (Claude, docs only)
 
-- [ ] Check off completed boxes here, folding in any deviations/lessons as italic notes (house style).
-- [ ] Mark #8 done in [ink-followups.md](ink-followups.md) with a summary paragraph matching entries #1–#7.
-- [ ] Update the walkthrough memory file to point at whatever's next.
+- [x] Check off completed boxes here, folding in any deviations/lessons as italic notes (house style).
+- [x] Mark #8 done in [ink-followups.md](ink-followups.md) with a summary paragraph matching entries #1–#7.
+- [x] Update the walkthrough memory file to point at whatever's next.
 
 ## Out of scope (deliberately)
 
