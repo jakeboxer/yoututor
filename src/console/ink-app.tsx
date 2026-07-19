@@ -18,24 +18,24 @@ function AppView(props: AppViewProps) {
 	return (
 		<>
 			<Static items={props.lines}>{(line, index) => <Text key={index}>{line}</Text>}</Static>
-		<Box flexDirection="column">
-			{props.current !== "" && <Text>{props.current}</Text>}
-			{props.awaitingInput && (
-				<Box>
-					<Text>
-						{"> "}
-						<TextInput
-							value={value}
-							onChange={setValue}
-							onSubmit={() => {
-								props.onSubmit(value);
-								setValue("");
-							}}
-						/>
-					</Text>
-				</Box>
-			)}
-		</Box>
+			<Box flexDirection="column">
+				{props.current !== "" && <Text>{props.current}</Text>}
+				{props.awaitingInput && (
+					<Box>
+						<Text>
+							{"> "}
+							<TextInput
+								value={value}
+								onChange={setValue}
+								onSubmit={() => {
+									props.onSubmit(value);
+									setValue("");
+								}}
+							/>
+						</Text>
+					</Box>
+				)}
+			</Box>
 		</>
 	);
 }
@@ -61,14 +61,14 @@ export class InkApp implements Renderer, Host {
 				this.current += event.text;
 				break;
 
-			// Reply finished: push the streamed line to the list of previous lines so the next output (a
-			// tool line or the input prompt) starts fresh. No-op when the reply had no text (e.g a pure
-			// tool call).
+			// Reply finished: append the streamed line to the list of previous lines so the next output
+			// (a tool line or the input prompt) starts fresh. No-op when the reply had no text (e.g a
+			// pure tool call).
 			case "modelResponded": {
 				const trimmedCurrent = this.current.trim();
 
 				if (trimmedCurrent !== "") {
-					this.lines.push(trimmedCurrent);
+					this.appendLine(trimmedCurrent);
 				}
 
 				this.current = "";
@@ -77,11 +77,11 @@ export class InkApp implements Renderer, Host {
 
 			// The event carries the full input/result; the renderer chooses a compact display.
 			case "toolRunStarted":
-				this.lines.push(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
+				this.appendLine(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
 				break;
 
 			case "toolRunFinished":
-				this.lines.push(`✓ ${event.name}`);
+				this.appendLine(`✓ ${event.name}`);
 				break;
 		}
 
@@ -114,12 +114,12 @@ export class InkApp implements Renderer, Host {
 		this.ink.rerender(this.buildView());
 	}
 
-	private submitInput(text: string): void {
+	private submitInput(text: string) {
 		if (this.inputResolver === null) return;
 
 		const resolver = this.inputResolver;
 
-		this.lines.push(`> ${text}`);
+		this.appendLine(`> ${text}`);
 		this.inputResolver = null;
 		this.rerender();
 
@@ -128,5 +128,9 @@ export class InkApp implements Renderer, Host {
 
 	private isAwaitingInput(): boolean {
 		return this.inputResolver !== null;
+	}
+
+	private appendLine(line: string) {
+		this.lines = [...this.lines, line];
 	}
 }
