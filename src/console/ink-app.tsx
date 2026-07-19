@@ -1,4 +1,4 @@
-import { Box, type Instance, render, Text } from "ink";
+import { Box, type Instance, render, Static, Text } from "ink";
 import TextInput from "ink-text-input";
 import { useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
@@ -16,11 +16,9 @@ function AppView(props: AppViewProps) {
 	const [value, setValue] = useState("");
 
 	return (
+		<>
+			<Static items={props.lines}>{(line, index) => <Text key={index}>{line}</Text>}</Static>
 		<Box flexDirection="column">
-			{props.lines.map((line, index) => (
-				// biome-ignore lint/suspicious/noArrayIndexKey: append-only log, entries never reorder
-				<Text key={index}>{line}</Text>
-			))}
 			{props.current !== "" && <Text>{props.current}</Text>}
 			{props.awaitingInput && (
 				<Box>
@@ -38,6 +36,7 @@ function AppView(props: AppViewProps) {
 				</Box>
 			)}
 		</Box>
+		</>
 	);
 }
 
