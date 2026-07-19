@@ -65,19 +65,21 @@ Item 7 of [ink-followups.md](ink-followups.md): the console layer has no tests. 
 
 The interesting half: `requestInput()` is driven end-to-end through the fake stdin, exercising `AppView` + TextInput + the resolver stash together.
 
-- [ ] A tiny `tick()` helper (`await new Promise(r => setTimeout(r, 0))`, bump the delay only if flaky) — stdin writes go through Ink's input parser → React state → rerender, which isn't synchronous.
-- [ ] `requestInput()` → frame shows the `> ` prompt. Assert *pending* with a flag: `let resolved = false; p.then(() => { resolved = true; })`, tick, expect false — never await the promise itself.
-- [ ] `instance.stdin.write("hi")` then `stdin.write("\r")` (Enter triggers TextInput's onSubmit) → promise resolves `"hi"`, echo line `> hi` in the frame, prompt gone.
-- [ ] Empty submit: `stdin.write("\r")` alone → still pending, no echo line.
-- [ ] Ctrl+D: `stdin.write("\x04")` (Ink parses it as ctrl+`d`) while awaiting → resolves `null`. When *not* awaiting → nothing happens (promise-less; just assert no crash/no state change).
+- [x] A tiny `tick()` helper (`await new Promise(r => setTimeout(r, 0))`, bump the delay only if flaky) — stdin writes go through Ink's input parser → React state → rerender, which isn't synchronous. *(0ms sufficed throughout; no flakiness.)*
+- [x] `requestInput()` → frame shows the prompt. Assert *pending* with a flag: `let resolved = false; p.then(() => { resolved = true; })`, tick, expect false — never await the promise itself.
+- [x] `instance.stdin.write("hi")` then `stdin.write("\r")` (Enter triggers TextInput's onSubmit) → promise resolves `"hi"`, echo line `> hi` in the frame, prompt gone.
+- [x] Empty submit: `stdin.write("\r")` alone → still pending, no echo line (asserted by counting lines containing the prompt — exactly 1 — since a substring check can't tell the live prompt from an echo).
+- [x] Ctrl+D: `stdin.write("\x04")` (Ink parses it as ctrl+`d`) while awaiting → resolves `null`. When *not* awaiting → nothing happens (byte-identical-frame assertion, same trick as the whitespace-reply test).
+
+**Gotcha found here — frames are environment-dependent, and CI is the environment that counts.** Chalk decides color support by sniffing the real `process.stdout` at load time, not the injected fake stream. In an interactive terminal, tests see styled frames: TextInput's cursor is an ANSI-inverse space after `"> "`, so `toContain("> ")` passed. Through a pipe (CI, hooks, agent runs), chalk degrades to plain text, the cursor becomes a bare trailing space, Ink strips it, and the prompt line is just `">"` — two tests green for Jake, red for Claude. Fix: assert on `">"` (true in both worlds) rather than forcing `FORCE_COLOR=0` in the test script (heavier, touches all tests). Corollary: **no ANSI codes exist in non-TTY test frames at all** — the "styled lines need substring assertions" caveat from the research notes only applies to interactive runs; plan-stage warnings about ANSI in frames were half-right. Verify both ways: `bun test <file>` and `bun test <file> | cat`.
 
 ### 7. Full verification pass (Jake runs, Claude checks output)
 
-- [ ] `bun test` (whole suite), `bun run typecheck`, `bun run lint`, one manual `bun src/index.ts` session.
+- [x] `bun test` (whole suite: 66 pass across 7 files), `bun run typecheck`, `bun run lint` all green. *(The manual session was covered by step 3's verify — no production code changed after it, only the test file and docs, so a re-run would have exercised nothing new.)*
 
 ### 8. Wrap-up (Claude, docs-only)
 
-- [ ] Check off item 7 in `ink-followups.md` with a `*(done DATE)*` summary paragraph; record findings/gotchas here as inline parentheticals per convention; update the walkthrough memory.
+- [x] Check off item 7 in `ink-followups.md` with a `*(done DATE)*` summary paragraph; record findings/gotchas here as inline parentheticals per convention; update the walkthrough memory.
 
 ## Out of scope (deliberately)
 
