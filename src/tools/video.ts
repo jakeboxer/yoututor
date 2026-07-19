@@ -20,31 +20,54 @@ export type LoadedVideo =
 	| { ok: true; metadata: VideoMetadata; transcriptEntries: TranscriptEntry[] }
 	| { ok: false; message: string };
 
-// A lazily-loaded, cached video (metadata + transcript) for one URL. load_video and
-// get_transcript_range share a single store so it's fetched at most once per session instead of
-// once per tool call.
+// The video the session is currently looking at: its URL paired with its (possibly still in-flight)
+// load. One object so readers can't observe the URL of one video with the promise of another
+// mid-switch.
+//
+// This is a cache entry, not a domain type. It exposes the store's promise-memoization mechanism,
+// and despite the name, `video` can still resolve to an { ok: false } load. If the store grows more
+// state (progress, multiple videos), replace this with an explicit state union (idle / loading /
+// ready) instead of extending it.
+export type CurrentVideo = { url: string; video: Promise<LoadedVideo> };
+
+// A lazily-loaded, cached video (metadata + transcript), shared by all tools so a video is fetched
+// at most once. Loading a different URL replaces the current video, switching the session to it.
+// current() lets tools that only need the URL (get_frames) or want to refuse before any load
+// (get_transcript_range) read the state without triggering a fetch.
 export type VideoStore = {
-	load(): Promise<LoadedVideo>;
+	load(url: string): Promise<LoadedVideo>;
+	current(): CurrentVideo | undefined;
 };
 
-export function createVideoStore(videoUrl: string): VideoStore {
+// `fetch` is injectable for tests; real callers use the default yt-dlp-backed fetchVideo.
+export function createVideoStore(
+	fetchVideo: (url: string) => Promise<LoadedVideo> = fetchVideoWithYtDlp,
+): VideoStore {
 	// Hold the in-flight/resolved promise (not the value) so concurrent callers share one fetch.
-	let cached: Promise<LoadedVideo> | undefined;
+	let cached: CurrentVideo | undefined;
 
 	return {
-		load() {
-			if (cached) return cached;
+		load(url) {
+			if (cached && cached.url === url) return cached.video;
 
-			const pending = fetchVideo(videoUrl);
-			cached = pending;
+			const entry: CurrentVideo = { url, video: fetchVideo(url) };
+			cached = entry;
 
-			// Don't let a transient failure wedge the whole session: if the load didn't succeed, drop it
-			// from the cache so the next call retries. (fetchVideo never rejects, so no catch here.)
-			pending.then((result) => {
-				if (!result.ok && cached === pending) cached = undefined;
+			// Don't let a transient failure hang the whole session; if the load didn't succeed, drop it
+			// from the cache so the next call retries. Guard on the entry so a load of a different URL
+			// that raced this failure isn't clobbered. (fetchVideoWithYtDlp never rejects, so no catch
+			// here.)
+			entry.video.then((result) => {
+				if (!result.ok && cached === entry) {
+					cached = undefined;
+				}
 			});
 
-			return pending;
+			return entry.video;
+		},
+
+		current() {
+			return cached;
 		},
 	};
 }
@@ -58,7 +81,7 @@ export function formatTranscript(entries: TranscriptEntry[]): string {
 // we take the video's existing captions (manual or YouTube's automatic ones), which are instant.
 // Transcribing the audio ourselves when none exist is a later step. Never rejects: any failure comes
 // back as { ok: false, message } so the tool has something to relay instead of crashing the loop.
-async function fetchVideo(videoUrl: string): Promise<LoadedVideo> {
+async function fetchVideoWithYtDlp(videoUrl: string): Promise<LoadedVideo> {
 	let dir: string | undefined;
 
 	try {
