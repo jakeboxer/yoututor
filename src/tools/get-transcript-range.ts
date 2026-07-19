@@ -64,7 +64,12 @@ export function createGetTranscriptRangeTool(videoStore: VideoStore): Tool {
 				return `get_transcript_range couldn't read its input: ${z.prettifyError(parsed.error)}`;
 			}
 
-			const video = await videoStore.load();
+			// If no video load has been started yet, let the model know that this tool can't be used
+			// until a videl load has been started.
+			const current = videoStore.current();
+			if (!current) return "No video is loaded yet. Call load_video with a YouTube URL first.";
+
+			const video = await current.video;
 			if (!video.ok) return video.message;
 
 			const start = parseTimestamp(parsed.data.start_timestamp);
