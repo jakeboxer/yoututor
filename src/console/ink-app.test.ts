@@ -14,6 +14,10 @@ function mountForTest() {
 	return { app, instance };
 }
 
+function tick() {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 test("mount shows the activity indicator", () => {
 	const { instance } = mountForTest();
 	expect(instance.lastFrame()).toContain("Thinking...");
@@ -65,4 +69,94 @@ test("toolRunFinished displays properly", () => {
 	expect(lastFrame).toContain("✓ get_frames");
 	expect(lastFrame).toContain("Thinking...");
 	expect(lastFrame).not.toContain("Running get_frames");
+});
+
+test("prompt appears, input request promise is pending", async () => {
+	const { app, instance } = mountForTest();
+	let resolved = false;
+
+	app.requestInput().then(() => {
+		resolved = true;
+	});
+
+	// Let TextInput mount.
+	await tick();
+
+	expect(resolved).toBeFalse();
+	expect(instance.lastFrame()).toContain(">");
+});
+
+test("submit input", async () => {
+	const { app, instance } = mountForTest();
+	const input = app.requestInput();
+
+	// Let TextInput mount.
+	await tick();
+
+	instance.stdin.write("hi");
+	await tick();
+
+	// Enter should fire TextInput's onSubmit.
+	instance.stdin.write("\r");
+	const result = await input;
+	const lastFrame = instance.lastFrame();
+
+	expect(result).toBe("hi");
+	expect(lastFrame).toContain("> hi");
+	expect(lastFrame).toContain("Thinking...");
+});
+
+test("empty submit does not resolve", async () => {
+	const { app, instance } = mountForTest();
+	let resolved = false;
+
+	app.requestInput().then(() => {
+		resolved = true;
+	});
+
+	// Let TextInput mount.
+	await tick();
+
+	// Enter should fire TextInput's onSubmit.
+	instance.stdin.write("\r");
+	await tick();
+
+	expect(resolved).toBeFalse();
+
+	// We can't use a normal toContain(">") here, because both the live prompt and an echoed prompt
+	// start with this string. However, if there's an echoed prompt, there's always also a live
+	// prompt, which means there would be at least 2 instances of ">". Because of this, we can just
+	// check the count of lines with ">".
+	expect(
+		instance
+			.lastFrame()
+			?.split("\n")
+			.filter((l) => l.includes(">")).length,
+	).toBe(1);
+});
+
+test("Ctrl+D while awaiting input resolves null", async () => {
+	const { app, instance } = mountForTest();
+	const input = app.requestInput();
+
+	// Let TextInput mount.
+	await tick();
+
+	// EOT byte. Ink parses this as Ctrl+D.
+	instance.stdin.write("\x04");
+
+	expect(await input).toBeNull();
+});
+
+test("Ctrl+D while busy is a no-op", async () => {
+	const { instance } = mountForTest();
+	const before = instance.lastFrame();
+
+	// Let TextInput mount.
+	await tick();
+
+	// EOT byte. Ink parses this as Ctrl+D.
+	instance.stdin.write("\x04");
+
+	expect(instance.lastFrame()).toBe(before);
 });
