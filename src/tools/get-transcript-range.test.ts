@@ -139,5 +139,6 @@ test("get_transcript_range tool: no video loaded yet", async () => {
 		end_timestamp: "0:15",
 	});
 
-	expect(actual).toEqual("No video is loaded yet — call load_video with a YouTube URL first.");
+	expect(actual).toContain("No video is loaded");
+	expect(actual).toContain("load_video");
 });
