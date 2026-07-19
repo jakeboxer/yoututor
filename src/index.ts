@@ -29,7 +29,7 @@ if (useConsole) {
 	host = consoleHost;
 	renderer = new ConsoleRenderer();
 } else {
-	const ink = new InkApp();
+	const ink = InkApp.mount();
 	host = ink;
 	renderer = ink;
 }

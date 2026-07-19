@@ -21,18 +21,18 @@ Item 7 of [ink-followups.md](ink-followups.md): the console layer has no tests. 
 
 ### 2. Add the dev dependency (Jake)
 
-- [ ] `bun add -d ink-testing-library` (expect 4.0.0).
+- [x] `bun add -d ink-testing-library` (expect 4.0.0).
 
 ### 3. Seam refactor in `src/console/ink-app.tsx` (Jake, guided)
 
-- [ ] Define a minimal seam type — what `InkApp` actually uses of Ink's `Instance`:
+- [x] Define a minimal seam type — what `InkApp` actually uses of Ink's `Instance`:
   ```ts
   type InkInstance = Pick<Instance, "rerender" | "clear" | "unmount">;
   type InkRender = (tree: ReactElement) => InkInstance;
   ```
-- [ ] Make the constructor `private`, taking the render function: `private constructor(renderFn: InkRender) { this.ink = renderFn(this.buildView()); }`. (The render must stay in the constructor — `buildView()` needs `this`, and a two-phase `new` + assign would make `ink` nullable everywhere. The point isn't moving the side effect, it's *naming* it and making the renderer injectable.)
-- [ ] Add the factory: `static mount(renderFn: InkRender = (tree) => render(tree, { exitOnCtrlC: false })): InkApp`.
-- [ ] Update the one call site in `src/index.ts`: `new InkApp()` → `InkApp.mount()`.
+- [x] Make the constructor `private`, taking the render function: `private constructor(renderFn: InkRender) { this.ink = renderFn(this.buildView()); }`. (The render must stay in the constructor — `buildView()` needs `this`, and a two-phase `new` + assign would make `ink` nullable everywhere. The point isn't moving the side effect, it's *naming* it and making the renderer injectable.)
+- [x] Add the factory: `static mount(renderFn: InkRender = defaultRender): InkApp`. *(The default landed as a named module-level const `defaultRender` above the class rather than an inline arrow in the signature — gives the migrated `exitOnCtrlC` rationale comment a home next to the code it explains. camelCase, not `DEFAULT_RENDER`: SCREAMING_SNAKE marks constant data like `THINKING_LABEL`; callables stay camelCase even as `const`s.)*
+- [x] Update the one call site in `src/index.ts`: `new InkApp()` → `InkApp.mount()`.
 - [ ] Verify: `bun run typecheck`, `bun run lint`, quick manual run (`bun src/index.ts`, `/exit`).
 
 ### 4. Test helper + first tests — `src/console/ink-app.test.ts` (Jake, guided)

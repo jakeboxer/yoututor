@@ -1,11 +1,16 @@
 import { Box, type Instance, render, Static, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { useState } from "react";
+import { type ReactElement, useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
 import type { Host } from "../agent/host.ts";
 import LogLineView, { type LogLine } from "./log-line-view.tsx";
 import type { Renderer } from "./renderer.ts";
 import Spinner from "./spinner.tsx";
+
+// Custom types for Ink's render function and the parts of Ink's Instance type that we use so we can
+// mock them in tests.
+type InkInstance = Pick<Instance, "rerender" | "clear" | "unmount">;
+type InkRender = (tree: ReactElement) => InkInstance;
 
 type AppViewProps = {
 	lines: LogLine[];
@@ -68,10 +73,15 @@ function AppView(props: AppViewProps) {
 	);
 }
 
+// We pass exitOnCtrlC: false because we want to make Ctrl+C exit immediately.
+//
+// By default, Ink handles the exit by just unmounting the UI, leaving the process stuck forever on
+// the pending requestInput promise.
+const defaultRender: InkRender = (tree) => render(tree, { exitOnCtrlC: false });
 const THINKING_LABEL = "Thinking...";
 
 export class InkApp implements Renderer, Host {
-	private ink: Instance;
+	private ink: InkInstance;
 
 	private lines: LogLine[] = [];
 	private current = "";
@@ -81,11 +91,18 @@ export class InkApp implements Renderer, Host {
 
 	private activity = THINKING_LABEL;
 
-	constructor() {
-		// We pass exitOnCtrlC: false because we want to make Ctrl+C exit immediately.
-		// By default, Ink handles the exit by just unmounting the UI, leaving the process stuck forever
-		// on the pending requestInput promise.
-		this.ink = render(this.buildView(), { exitOnCtrlC: false });
+	private constructor(renderFn: InkRender) {
+		this.ink = renderFn(this.buildView());
+	}
+
+	/**
+	 * Mount the Ink app and render the initial empty view.
+	 * @param renderFn Function to use for rendering. Uses Ink's render() by default, but can be
+	 * overridden for testing.
+	 * @returns The mounted Ink app.
+	 */
+	static mount(renderFn: InkRender = defaultRender): InkApp {
+		return new InkApp(renderFn);
 	}
 
 	handle(event: AgentEvent): void {
