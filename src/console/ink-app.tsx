@@ -136,6 +136,7 @@ export class InkApp implements Renderer, Host {
 	}
 
 	unmount(): void {
+		this.ink.clear();
 		this.ink.unmount();
 	}
 
