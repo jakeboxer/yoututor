@@ -1,0 +1,87 @@
+# Ink follow-up #7: Tests for the Ink layer — guided walkthrough
+
+## Context
+
+Item 7 of [ink-followups.md](ink-followups.md): the console layer has no tests. The Ink layer gets them via **ink-testing-library** (new dev dependency), plus the seam refactor the bullet prescribes: `InkApp`'s constructor currently calls Ink's `render()` — constructing the object paints the terminal. The fix is a static `InkApp.mount()` factory whose parameter is the render function, so `index.ts` announces the paint and tests inject ink-testing-library's fake instead of real stdout.
+
+**Ground rule (established walkthrough convention):** Jake types every line of code; Claude explains what to write and why, reviews, and runs read-only checks (`bun run typecheck`, `bun run lint`, `bun test`). The only files Claude edits are this doc (creation + progress checkboxes) and docs-only wrap-up edits.
+
+### Research findings that shape the design (verified up front)
+
+- **ink-testing-library@4.0.0 is compatible with Ink 7 by construction**: it has no peer dep on `ink` — it imports `render` from the host project's `ink` (7.1.1 here) and passes fake `Stdout`/`Stdin` streams with `debug: true, exitOnCtrlC: false, patchConsole: false`. All options it passes exist in Ink 7. Smoke-test early anyway (step 4's first test) since its own dev deps pin Ink 5.
+- **`debug: true` is why frame assertions work**: in debug mode Ink writes the *entire* output (Static region included) on every frame — `lastFrame()` shows everything, no ANSI cursor gymnastics. But **color/dim ANSI codes are still in the frames** → assert with `toContain` on plain substrings, not exact equality.
+- **Its instance has no `clear()`**: it returns `{ rerender, unmount, cleanup, stdout, stdin, frames, lastFrame }`. `InkApp.unmount()` calls `this.ink.clear()` — so the seam type must be minimal (`rerender`/`clear`/`unmount`), and the test helper wraps the library instance with a no-op `clear`.
+- **Existing test conventions** (`src/tools/*.test.ts`): co-located `<name>.test.ts`, `import { expect, test } from "bun:test"`, plain `test()` (no `describe`), hand-rolled fakes via local factory functions, no mocking library.
+
+## Steps
+
+### 1. Claude saves this plan to the repo (Claude — the only execution step)
+
+- [x] Write this document to `docs/plans/ink-tests.md`.
+
+### 2. Add the dev dependency (Jake)
+
+- [ ] `bun add -d ink-testing-library` (expect 4.0.0).
+
+### 3. Seam refactor in `src/console/ink-app.tsx` (Jake, guided)
+
+- [ ] Define a minimal seam type — what `InkApp` actually uses of Ink's `Instance`:
+  ```ts
+  type InkInstance = Pick<Instance, "rerender" | "clear" | "unmount">;
+  type InkRender = (tree: ReactElement) => InkInstance;
+  ```
+- [ ] Make the constructor `private`, taking the render function: `private constructor(renderFn: InkRender) { this.ink = renderFn(this.buildView()); }`. (The render must stay in the constructor — `buildView()` needs `this`, and a two-phase `new` + assign would make `ink` nullable everywhere. The point isn't moving the side effect, it's *naming* it and making the renderer injectable.)
+- [ ] Add the factory: `static mount(renderFn: InkRender = (tree) => render(tree, { exitOnCtrlC: false })): InkApp`.
+- [ ] Update the one call site in `src/index.ts`: `new InkApp()` → `InkApp.mount()`.
+- [ ] Verify: `bun run typecheck`, `bun run lint`, quick manual run (`bun src/index.ts`, `/exit`).
+
+### 4. Test helper + first tests — `src/console/ink-app.test.ts` (Jake, guided)
+
+- [ ] Co-located, follows the tools-tests style. No JSX in the test file (InkApp builds its own tree), so `.ts` not `.tsx`; import `ink-app.tsx` with its extension.
+- [ ] Hand-rolled helper in the local-factory style:
+  ```ts
+  function mountForTest() {
+    let instance!: ReturnType<typeof render>;   // ink-testing-library's render
+    const app = InkApp.mount((tree) => {
+      instance = render(tree);
+      return { rerender: instance.rerender, unmount: instance.unmount, clear: () => {} };
+    });
+    return { app, instance };
+  }
+  ```
+- [ ] `afterEach(cleanup)` (from ink-testing-library) so the Spinner's interval never outlives a test.
+- [ ] First tests (also the Ink-7 compat smoke test):
+  - mount → `lastFrame()` shows the spinner line with `Thinking...` (busy, nothing streaming).
+  - two `textDelta` events → frame contains the concatenated text.
+  - `modelResponded` → reply lands in the Static region (still in `lastFrame()` thanks to debug mode), streaming line gone; whitespace-only current appends nothing.
+
+### 5. Tool-event tests (Jake, guided)
+
+- [ ] `toolRunStarted` → frame contains `⚙ <name> <json input>` and activity flips to `Running <name>`.
+- [ ] `toolRunFinished` → frame contains `✓ <name>`, activity back to `Thinking...`.
+- [ ] Remember: substring assertions (`toContain`) — the lines carry color codes.
+
+### 6. Promise-bridge tests (Jake, guided)
+
+The interesting half: `requestInput()` is driven end-to-end through the fake stdin, exercising `AppView` + TextInput + the resolver stash together.
+
+- [ ] A tiny `tick()` helper (`await new Promise(r => setTimeout(r, 0))`, bump the delay only if flaky) — stdin writes go through Ink's input parser → React state → rerender, which isn't synchronous.
+- [ ] `requestInput()` → frame shows the `> ` prompt. Assert *pending* with a flag: `let resolved = false; p.then(() => { resolved = true; })`, tick, expect false — never await the promise itself.
+- [ ] `instance.stdin.write("hi")` then `stdin.write("\r")` (Enter triggers TextInput's onSubmit) → promise resolves `"hi"`, echo line `> hi` in the frame, prompt gone.
+- [ ] Empty submit: `stdin.write("\r")` alone → still pending, no echo line.
+- [ ] Ctrl+D: `stdin.write("\x04")` (Ink parses it as ctrl+`d`) while awaiting → resolves `null`. When *not* awaiting → nothing happens (promise-less; just assert no crash/no state change).
+
+### 7. Full verification pass (Jake runs, Claude checks output)
+
+- [ ] `bun test` (whole suite), `bun run typecheck`, `bun run lint`, one manual `bun src/index.ts` session.
+
+### 8. Wrap-up (Claude, docs-only)
+
+- [ ] Check off item 7 in `ink-followups.md` with a `*(done DATE)*` summary paragraph; record findings/gotchas here as inline parentheticals per convention; update the walkthrough memory.
+
+## Out of scope (deliberately)
+
+- **Ctrl+C / `interrupt()`**: calls `process.exit(130)` — testing it means injecting an exit function, more seam than it's worth right now. Noted as a future seam if ever needed.
+- **`Spinner` unit tests**: timer-driven animation; its correctness is visual. It's mounted (and cleaned up) in the InkApp tests, which is enough.
+- **`AppView`-only tests**: driving through `InkApp` covers the component; separate component tests would duplicate.
+- **Console (`consoleHost`/`ConsoleRenderer`) tests**: item 7 is scoped to the Ink layer.
