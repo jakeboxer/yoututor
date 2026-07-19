@@ -33,12 +33,12 @@ Item 7 of [ink-followups.md](ink-followups.md): the console layer has no tests. 
 - [x] Make the constructor `private`, taking the render function: `private constructor(renderFn: InkRender) { this.ink = renderFn(this.buildView()); }`. (The render must stay in the constructor — `buildView()` needs `this`, and a two-phase `new` + assign would make `ink` nullable everywhere. The point isn't moving the side effect, it's *naming* it and making the renderer injectable.)
 - [x] Add the factory: `static mount(renderFn: InkRender = defaultRender): InkApp`. *(The default landed as a named module-level const `defaultRender` above the class rather than an inline arrow in the signature — gives the migrated `exitOnCtrlC` rationale comment a home next to the code it explains. camelCase, not `DEFAULT_RENDER`: SCREAMING_SNAKE marks constant data like `THINKING_LABEL`; callables stay camelCase even as `const`s.)*
 - [x] Update the one call site in `src/index.ts`: `new InkApp()` → `InkApp.mount()`.
-- [ ] Verify: `bun run typecheck`, `bun run lint`, quick manual run (`bun src/index.ts`, `/exit`).
+- [x] Verify: `bun run typecheck`, `bun run lint`, quick manual run (`bun src/index.ts`, `/exit`).
 
 ### 4. Test helper + first tests — `src/console/ink-app.test.ts` (Jake, guided)
 
-- [ ] Co-located, follows the tools-tests style. No JSX in the test file (InkApp builds its own tree), so `.ts` not `.tsx`; import `ink-app.tsx` with its extension.
-- [ ] Hand-rolled helper in the local-factory style:
+- [x] Co-located, follows the tools-tests style. No JSX in the test file (InkApp builds its own tree), so `.ts` not `.tsx`; import `ink-app.tsx` with its extension.
+- [x] Hand-rolled helper in the local-factory style:
   ```ts
   function mountForTest() {
     let instance!: ReturnType<typeof render>;   // ink-testing-library's render
@@ -49,17 +49,17 @@ Item 7 of [ink-followups.md](ink-followups.md): the console layer has no tests. 
     return { app, instance };
   }
   ```
-- [ ] `afterEach(cleanup)` (from ink-testing-library) so the Spinner's interval never outlives a test.
-- [ ] First tests (also the Ink-7 compat smoke test):
-  - mount → `lastFrame()` shows the spinner line with `Thinking...` (busy, nothing streaming).
+- [x] `afterEach(cleanup)` (from ink-testing-library) so the Spinner's interval never outlives a test.
+- [x] First tests (also the Ink-7 compat smoke test):
+  - mount → `lastFrame()` shows the spinner line with `Thinking...` (busy, nothing streaming). *(Passed on first run — ink-testing-library@4 confirmed working against Ink 7.)*
   - two `textDelta` events → frame contains the concatenated text.
-  - `modelResponded` → reply lands in the Static region (still in `lastFrame()` thanks to debug mode), streaming line gone; whitespace-only current appends nothing.
+  - `modelResponded` → reply lands in the Static region (still in `lastFrame()` thanks to debug mode), streaming line gone; whitespace-only current appends nothing. *(Jake's improvement over the sketch: assert the trim via `lastFrame.split("\n")` + array-`toContain` — exact line equality, which distinguishes `"answer"` from `"  answer  "` where a substring match can't. Works because the reply branch is unstyled `<Text>` — no ANSI on that line. The whitespace-only case asserts `lastFrame()` is byte-identical (`toBe`) to the pre-event frame — valid because `handle()` is fully synchronous, so not even the spinner's frame char has ticked. Typecheck note: Ink 7's `Instance.rerender` takes `ReactNode`, the library's takes `ReactElement`; the `Pick`-based seam absorbs this because method-declared types get bivariant parameter checking.)*
 
 ### 5. Tool-event tests (Jake, guided)
 
-- [ ] `toolRunStarted` → frame contains `⚙ <name> <json input>` and activity flips to `Running <name>`.
-- [ ] `toolRunFinished` → frame contains `✓ <name>`, activity back to `Thinking...`.
-- [ ] Remember: substring assertions (`toContain`) — the lines carry color codes.
+- [x] `toolRunStarted` → frame contains `⚙ <name> <json input>` and activity flips to `Running <name>`.
+- [x] `toolRunFinished` → frame contains `✓ <name>`, activity back to `Thinking...`. *(Lesson that came up: the first draft fired `toolRunFinished` without a preceding `toolRunStarted`, so the `Thinking...` assertion passed trivially — the label had never left. A restore-assertion only bites if the state actually flipped first; fixed by firing the start event, plus `not.toContain("Running get_frames")` to pin the transition from both sides.)*
+- [x] Remember: substring assertions (`toContain`) — the lines carry color codes.
 
 ### 6. Promise-bridge tests (Jake, guided)
 
