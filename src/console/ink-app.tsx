@@ -3,20 +3,12 @@ import TextInput from "ink-text-input";
 import { useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
 import type { Host } from "../agent/host.ts";
+import LogLineView, { type LogLine } from "./log-line-view.tsx";
 import type { Renderer } from "./renderer.ts";
 import Spinner from "./spinner.tsx";
 
-type LogLine = {
-	kind:
-		| "reply" // A full reply from the model.
-		| "toolStart" // The model started a tool call.
-		| "toolDone" // The model finished a tool call.
-		| "echo"; // The user's submitted input, echoed into the log.
-	text: string;
-};
-
 type AppViewProps = {
-	lines: string[];
+	lines: LogLine[];
 	current: string;
 	awaitingInput: boolean;
 	activity: string;
@@ -46,10 +38,12 @@ function AppView(props: AppViewProps) {
 
 	return (
 		<>
-			<Static items={props.lines}>{(line, index) => <Text key={index}>{line}</Text>}</Static>
+			<Static items={props.lines}>
+				{(line, index) => <LogLineView key={index} line={line} />}
+			</Static>
 			<Box flexDirection="column">
 				{!props.awaitingInput && props.current === "" && (
-					<Text>
+					<Text dimColor>
 						<Spinner /> {props.activity}
 					</Text>
 				)}

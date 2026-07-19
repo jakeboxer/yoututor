@@ -18,22 +18,23 @@ Follow-ups deferred from the minimal integration ([ink-minimal-integration.md](i
 
   `index.ts` kept the bare console host/renderer as a commented-out block, but swapping required a three-spot hand edit (duplicate `const`s, missing imports, no `unmount()` on `consoleHost`). Replaced with a real `--console` CLI flag: args are `Bun.argv.slice(2)`, the flag is `includes("--console")`, and the video URL is the first arg *not* starting with `--` — so flag and URL compose in either order. The two pairs assign into `let host: Host; let renderer: Renderer;` (Ink fills both from one `InkApp`; console uses `consoleHost` + `new ConsoleRenderer()`). The lifecycle special-case went away by making teardown part of the port: `Renderer` gained an optional `unmount?(): void` — for renderers that take over the terminal, undefined for line-writers — and `index.ts` ends with one uniform `renderer.unmount?.()`.
 
-- [ ] **5. Visual polish**
+- [x] **5. Visual polish** *(done 2026-07-19; markdown spun out as #8)*
 
-  All cosmetic, all confined to `AppView`:
-  - Color/dim the `⚙`/`✓` tool lines and the `> ` echoes so replies stand out.
-  - Split multi-paragraph replies on newlines at push time (each `lines` entry is currently a whole reply block — works, since `<Text>` renders embedded `\n`s, but per-line entries compose better with `<Static>` and styling).
-  - Markdown rendering of replies (e.g. `ink-markdown`) — only after the basics feel right.
+  Styled the log so replies stand out. The load-bearing decision: **semantic store, presentational render** — `InkApp.lines` became `LogLine[]` (`{ kind: "reply" | "toolStart" | "toolDone" | "echo"; text }`), one entry per event, replies pushed *whole*; all styling lives in a new `LogLineView` component (`src/console/log-line-view.tsx`, which also owns the `LogLine` type — one-way import into `ink-app.tsx`) that switches on `kind`: toolStart yellow, toolDone green, echo dim, reply default. The spinner/activity line is dimmed via the outer `<Text>` in `AppView` (`Spinner` stays style-agnostic). The originally-sketched push-time newline splitting was deliberately dropped: markdown parsing needs whole replies (code fences/lists span lines), and `<Text>` renders embedded `\n`s fine — so per-line display, if ever wanted, is a render-time concern. Gotcha recorded for posterity: `key` belongs on the element mapped inside `<Static>`'s render function (`<LogLineView key={index} ...>`), not on the `<Text>` inside the component, where React silently ignores it. Full walkthrough: [ink-visual-polish.md](ink-visual-polish.md).
 
-- [ ] **6. Empty-submit noise**
+- [x] **6. Empty-submit noise** *(done 2026-07-19, bundled with #5)*
 
-  Submitting an empty input echoes a bare `> ` line into the log before the agent re-prompts. Either skip the echo for empty text in `submitInput`, or don't resolve at all on empty submit (keep waiting). Tiny; bundle with other polish.
+  Chose "don't resolve": `submitInput` early-returns when the trimmed text is empty — before the echo and before resolving — so a blank Enter neither logs a `> ` line nor wakes the agent loop; the prompt just keeps waiting. Non-empty input is still echoed untrimmed (reject blank submissions, don't mangle real ones).
 
 - [ ] **7. Tests for the Ink layer**
 
   The console layer has no tests; the Ink layer could get them via `ink-testing-library` (new dev dependency): mount `AppView` / drive `InkApp.handle()` with synthetic `AgentEvent`s and assert on the rendered frames, plus the `requestInput()` promise-bridge behavior. Worth doing before the UI grows much — the imperative `rerender()` driver makes `InkApp` easy to drive synthetically.
 
   Do this refactor as part of the test work: `InkApp`'s constructor currently calls `render()`, i.e. constructing the object paints the terminal (claims stdout, patches `console`). The lifecycle itself is fine — the object *is* the live UI session, and two-phase `new` + `mount()` would be worse (nullable `ink` field, "constructed but not mounted" state everywhere). But name the side effect and create a test seam: make the constructor private and trivial, expose a static factory (`InkApp.mount()`) so the call site in `index.ts` announces the paint, and let the factory/constructor accept the render function (or Ink `Instance`) as a parameter so tests can inject `ink-testing-library`'s fake instead of real stdout.
+
+- [ ] **8. Markdown rendering of replies** *(deferred from #5)*
+
+  Swap the `reply` branch of `LogLineView` (`src/console/log-line-view.tsx`) for a markdown component — that's the whole change; #5's store/render split was designed so replies arrive whole with their block structure intact (`line.text`). Needs an Ink-7-compatible component: check current docs first, `ink-markdown` is old. The streaming `current` line stays plain text regardless (rendering half-streamed markdown is janky).
 
 ## Someday / open questions
 
