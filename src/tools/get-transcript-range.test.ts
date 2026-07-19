@@ -1,5 +1,20 @@
 import { expect, test } from "bun:test";
 import { createGetTranscriptRangeTool, selectTranscriptRange } from "./get-transcript-range.ts";
+import type { LoadedVideo, VideoStore } from "./video.ts";
+
+// A store already holding `video`, as if load_video had run. The tool only reads current().
+function storeWith(video: LoadedVideo): VideoStore {
+	const current = {
+		url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		video: Promise.resolve(video),
+	};
+	return { load: () => current.video, current: () => current };
+}
+
+const emptyStore: VideoStore = {
+	load: () => Promise.resolve({ ok: false, message: "unused" }),
+	current: () => undefined,
+};
 
 const entry1 = {
 	start: 0,
@@ -15,18 +30,16 @@ const transcript1 = "[00:00] We're no strangers to love.";
 const transcript2 = "[00:10] You know the rules, and so do I.";
 const fullTranscript = `${transcript1}\n${transcript2}`;
 
-const mockGetTranscriptRangeTool = createGetTranscriptRangeTool({
-	load() {
-		return Promise.resolve({
-			ok: true,
-			metadata: {
-				title: "Never Gonna Give You Up",
-				description: "The official video by Rick Astley.",
-			},
-			transcriptEntries: [entry1, entry2],
-		});
-	},
-});
+const mockGetTranscriptRangeTool = createGetTranscriptRangeTool(
+	storeWith({
+		ok: true,
+		metadata: {
+			title: "Never Gonna Give You Up",
+			description: "The official video by Rick Astley.",
+		},
+		transcriptEntries: [entry1, entry2],
+	}),
+);
 
 test("selectTranscriptRange: just start of video", () => {
 	expect(selectTranscriptRange(allEntries, 0, 0)).toEqual([entry1]);
@@ -109,18 +122,22 @@ test("get_transcript_range tool: bad input", async () => {
 
 test("get_transcript_range tool: video failed to load", async () => {
 	const errorMessage = "Video failed to load.";
-	const failingGetTranscriptRangeTool = createGetTranscriptRangeTool({
-		load() {
-			return Promise.resolve({
-				ok: false,
-				message: errorMessage,
-			});
-		},
-	});
+	const failingGetTranscriptRangeTool = createGetTranscriptRangeTool(
+		storeWith({ ok: false, message: errorMessage }),
+	);
 	const actual = await failingGetTranscriptRangeTool.run({
 		start_timestamp: "0:00",
 		end_timestamp: "0:15",
 	});
 
 	expect(actual).toEqual(errorMessage);
+});
+
+test("get_transcript_range tool: no video loaded yet", async () => {
+	const actual = await createGetTranscriptRangeTool(emptyStore).run({
+		start_timestamp: "0:00",
+		end_timestamp: "0:15",
+	});
+
+	expect(actual).toEqual("No video is loaded yet — call load_video with a YouTube URL first.");
 });
