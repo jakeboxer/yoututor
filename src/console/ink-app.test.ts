@@ -51,6 +51,14 @@ test("reply markdown renders without raw markers", () => {
 	expect(lastFrame).not.toContain("**");
 });
 
+test("blank line between reply paragraphs is preserved", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "textDelta", text: "para one\n\npara two" });
+	app.handle({ type: "modelResponded" });
+
+	expect(instance.lastFrame()).toContain("para one\n\npara two");
+});
+
 test("whitespace-only reply appends nothing", () => {
 	const { app, instance } = mountForTest();
 	const before = instance.lastFrame();
