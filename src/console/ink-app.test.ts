@@ -41,6 +41,16 @@ test("modelResponded event moves the reply into the log", () => {
 	expect(lastFrame).toContain("Thinking...");
 });
 
+test("reply markdown renders without raw markers", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "textDelta", text: "**bold** item" });
+	app.handle({ type: "modelResponded" });
+
+	const lastFrame = instance.lastFrame();
+	expect(lastFrame).toContain("bold");
+	expect(lastFrame).not.toContain("**");
+});
+
 test("whitespace-only reply appends nothing", () => {
 	const { app, instance } = mountForTest();
 	const before = instance.lastFrame();
