@@ -11,7 +11,7 @@ type LogLine = {
 		| "reply" // A full reply from the model.
 		| "toolStart" // The model started a tool call.
 		| "toolDone" // The model finished a tool call.
-		| "echo"; // A prompt from the user.
+		| "echo"; // The user's submitted input, echoed into the log.
 	text: string;
 };
 
@@ -165,10 +165,13 @@ export class InkApp implements Renderer, Host {
 
 	private submitInput(text: string) {
 		if (this.inputResolver === null) return;
+		if (text.trim() === "") return;
 
 		const resolver = this.inputResolver;
 
+		// We append the un-trimmed text here to visually preserve exactly what the user typed.
 		this.appendLine({ kind: "echo", text: `> ${text}` });
+
 		this.inputResolver = null;
 		this.rerender();
 
