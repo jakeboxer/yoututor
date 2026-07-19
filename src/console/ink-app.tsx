@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
 import type { Host } from "../agent/host.ts";
 import type { Renderer } from "./renderer.ts";
+import Spinner from "./spinner.tsx";
 
 type AppViewProps = {
 	lines: string[];
@@ -38,7 +39,11 @@ function AppView(props: AppViewProps) {
 		<>
 			<Static items={props.lines}>{(line, index) => <Text key={index}>{line}</Text>}</Static>
 			<Box flexDirection="column">
-				{!props.awaitingInput && props.current === "" && <Text>⠋ {props.activity}</Text>}
+				{!props.awaitingInput && props.current === "" && (
+					<Text>
+						<Spinner /> {props.activity}
+					</Text>
+				)}
 				{props.current !== "" && <Text>{props.current}</Text>}
 				{props.awaitingInput && (
 					<Box>
