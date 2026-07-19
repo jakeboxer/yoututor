@@ -2,9 +2,9 @@
 
 Follow-ups deferred from the minimal integration ([ink-minimal-integration.md](ink-minimal-integration.md), completed 2026-07-18), roughly in suggested order. Each stands alone; none is urgent — the current `InkApp` works end-to-end.
 
-## 1. `<Static>` for scrollback — the one real correctness gap
+## 1. `<Static>` for scrollback — the one real correctness gap ✅ DONE (2026-07-18)
 
-Everything renders in Ink's dynamic region, which is capped at terminal height: a long session's earlier lines get clipped rather than scrolling into terminal history. Fix by moving completed entries (`lines`) into Ink's `<Static>` component — items render once, permanently, above the dynamic region — while only the in-progress `current` text and the input field stay dynamic. This is the standard Ink pattern for log-style apps (test runners use it). Small change; touches only `AppView`.
+Everything rendered in Ink's dynamic region, which is capped at terminal height. When a frame overflows, Ink 7.1.1 falls back to a full clearTerminal + whole-frame rewrite on every render — `\x1b[3J` destroys the terminal's real scrollback (including pre-launch shell history) each frame, and every streaming delta rewrites the entire session. Fixed by moving completed entries (`lines`) into Ink's `<Static>` component — items render once, permanently, above the dynamic region — while only the in-progress `current` text and the input field stay dynamic; the dynamic region now stays small enough that the fallback never fires. Touched `AppView` plus one requirement on `InkApp`: `<Static>` memoizes on the `items` array *reference*, so appends must create a fresh array (private `appendLine`), not `push` in place. Full walkthrough + findings: [ink-static-scrollback.md](ink-static-scrollback.md).
 
 ## 2. Ctrl+D → `null` (EOF parity with `consoleHost`)
 

@@ -2,7 +2,9 @@
 
 ## Context
 
-The minimal Ink integration (completed 2026-07-18) renders everything — completed log lines, the streaming reply, and the input field — inside Ink's dynamic region. Ink redraws that region by erasing and rewriting its lines on every render, and it is capped at the terminal height: in a long session, earlier lines get clipped instead of scrolling into terminal history. This is follow-up #1 in [ink-followups.md](ink-followups.md), called out there as "the one real correctness gap."
+The minimal Ink integration (completed 2026-07-18) renders everything — completed log lines, the streaming reply, and the input field — inside Ink's dynamic region. Ink redraws that region by erasing and rewriting its lines on every render, and it is capped at the terminal height. This is follow-up #1 in [ink-followups.md](ink-followups.md), called out there as "the one real correctness gap."
+
+**Overflow behavior (verified against Ink 7.1.1 source in step 2):** when a frame is taller than the viewport, Ink falls back to rewriting the *entire* frame on every render, prefixed with `clearTerminal` = `\x1b[2J\x1b[3J\x1b[H` (`ink/build/ink.js:748` + `ansi-escapes/base.js:124`). No conversation content is lost — the final frame's overflow spills into scrollback — but every streaming delta rewrites the whole session (O(session) bytes per frame), and `\x1b[3J` erases the terminal's real scrollback each frame, destroying everything from before the app launched. That is the bug `<Static>` fixes, and the step-6 verification target: *pre-launch shell history survives the session*.
 
 The fix is the standard Ink pattern for log-style apps: move completed entries (`lines`) into Ink's `<Static>` component, which renders each item exactly once, permanently, **above** the dynamic region — so they flow into normal terminal scrollback. Only the in-progress `current` text and the input prompt stay dynamic. The change touches only `AppView` in `src/console/ink-app.tsx`.
 
@@ -18,7 +20,7 @@ Verified against current Ink docs (Context7, `/vadimdemedes/ink`): `<Static item
 
 ### 2. See the bug (optional but recommended, ~2 min)
 
-- [ ] Shrink the terminal window to something short (~10 rows), run `bun src/index.ts <some video url>`, and have a conversation long enough to overflow the window. Watch earlier lines get clipped/overwritten instead of scrolling into history. Knowing exactly what broken looks like makes the fix verifiable.
+- [x] Shrink the terminal window to something short (~10 rows), run `bun src/index.ts <some video url>`, and have a conversation long enough to overflow the window. *(Done — observed behavior differed from the original prediction; see the correction in Context above.)*
 - Note: use Ghostty, not Warp — Ink input is laggy in Warp and that would muddy the observation.
 
 ### 3. Understand `<Static>` before touching code
@@ -31,31 +33,32 @@ Key semantics to have in mind (discuss before editing):
 
 ### 4. Edit `AppView` in `src/console/ink-app.tsx` (Jake writes)
 
-- [ ] Import `Static` from `ink`.
-- [ ] Replace the `props.lines.map(...)` block inside the dynamic `<Box>` with a `<Static items={props.lines}>` whose child function renders each line as a `<Text key={index}>`.
-- [ ] Place `<Static>` **before** (as a sibling of) the dynamic `<Box flexDirection="column">`, wrapping both in a fragment (`<>...</>`), so the component reads top-to-bottom the way the terminal does: permanent log first, then the live region (`current` + input prompt).
-- [ ] Keep/move the `biome-ignore lint/suspicious/noArrayIndexKey` comment onto the new key usage if Biome still flags it.
+- [x] Import `Static` from `ink`.
+- [x] Replace the `props.lines.map(...)` block inside the dynamic `<Box>` with a `<Static items={props.lines}>` whose child function renders each line as a `<Text key={index}>`.
+- [x] Place `<Static>` **before** (as a sibling of) the dynamic `<Box flexDirection="column">`, wrapping both in a fragment (`<>...</>`), so the component reads top-to-bottom the way the terminal does: permanent log first, then the live region (`current` + input prompt).
+- [x] Keep/move the `biome-ignore lint/suspicious/noArrayIndexKey` comment onto the new key usage if Biome still flags it. *(Biome doesn't flag index keys in a render-prop child, so no comment needed.)*
+
+- [x] In `InkApp`, append to `lines` immutably: replace each `this.lines.push(x)` (four sites — `modelResponded`, `toolRunStarted`, `toolRunFinished`, `submitInput`) with `this.lines = [...this.lines, x]`, or a private `appendLine` helper doing the same. This is required by how `<Static>` consumes `items`: it memoizes `items.slice(index)` on `[items, index]` and advances `index` via a `useLayoutEffect` keyed on `items.length` — the memo only recomputes when the array *reference* changes, so each append must produce a fresh array for its item to ever be painted.
 
 What deliberately does **not** change:
-- `InkApp` (the class) — `lines` is already append-only, and every mutation is followed by an unconditional `rerender()` with a fresh element tree, so `<Static>` sees the grown array and paints just the new entries. Mutating the same array reference is fine for exactly that reason (worth talking through — it's the subtle part).
 - `current` handling — the streaming line stays dynamic until `modelResponded` pushes its trimmed form into `lines`, at which point it becomes permanent. That handoff already exists; `<Static>` just changes where pushed lines live.
 
 ### 5. Static checks (Claude runs, read-only)
 
-- [ ] `bun run typecheck`
-- [ ] `bun run lint`
+- [x] `bun run typecheck`
+- [x] `bun run lint`
 
 ### 6. End-to-end verification
 
-- [ ] Re-run the step-2 experiment: short terminal, long conversation. Completed replies, tool lines, and `> ` echoes should now scroll up into terminal history (scrollable after the session), while only the streaming line and the input prompt occupy the bottom dynamic region.
-- [ ] Confirm streaming still looks right: the in-progress reply updates in place, then "freezes" into scrollback when complete, with no duplicate or dropped lines.
-- [ ] Confirm `/exit` still unmounts cleanly.
+- [x] Re-run the step-2 experiment: short terminal, long conversation. Key check (per the Context correction): **shell history from before launching the app must survive in scrollback** — the dynamic region staying small means Ink's clearTerminal fallback never fires. Completed replies, tool lines, and `> ` echoes should flow into terminal history, with only the streaming line and input prompt in the bottom dynamic region.
+- [x] Confirm streaming still looks right: the in-progress reply updates in place, then "freezes" into scrollback when complete, with no duplicate or dropped lines. *(First attempt surfaced a real bug — in-place `push` made `<Static>` skip every appended line; fixed via immutable `appendLine`.)*
+- [x] Confirm `/exit` still unmounts cleanly.
 
 ### 7. Wrap-up housekeeping
 
-- [ ] Check off the boxes in this file.
-- [ ] Jake marks follow-up #1 as done in `docs/plans/ink-followups.md` (his edit, or Claude's if he prefers — it's a docs file, not source).
-- [ ] Claude updates the `ink-integration-walkthrough` memory with the new progress.
+- [x] Check off the boxes in this file.
+- [x] Jake marks follow-up #1 as done in `docs/plans/ink-followups.md` (his edit, or Claude's if he prefers — it's a docs file, not source). *(Claude's edit, at Jake's request; the entry's stale "clipping" description was corrected in the same pass.)*
+- [x] Claude updates the `ink-integration-walkthrough` memory with the new progress.
 
 ## Out of scope (deliberately)
 
