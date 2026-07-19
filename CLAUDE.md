@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 YouTutor is a command-line tutor for YouTube videos: load a video, then ask questions about specific moments. It answers using both the transcript around a timestamp and the actual video frames from that point.
 
-**Layout & intent.** The agent loop lives in `src/agent/` (`agent.ts` runs the model conversation and the tool-call loop, streaming the reply); tools live under `src/tools/` (each a `Tool`, collected in `registry.ts`); console adapters live under `src/console/` (host + renderer). `src/index.ts` is a thin composition root that takes an optional YouTube URL as its first CLI arg and wires host + tools + agent + renderer. The loop reaches the world only through two ports — an **Output** event stream and an injected **Input** `Host`, detailed under *Intended architecture* below — and stays UI-agnostic. Haiku is the dev model. The build order is deliberate: get the agent loop solid behind a plain console interface *before* layering on the Ink UI.
+**Layout & intent.** The agent loop lives in `src/agent/` (`agent.ts` runs the model conversation and the tool-call loop, streaming the reply); tools live under `src/tools/` (each a `Tool`, collected in `registry.ts`); console adapters live under `src/console/` — the default interface is Ink (`InkApp` in `ink-app.tsx`, implementing both `Renderer` and `Host`, plus `spinner.tsx`), with the bare console pair (`console-host.ts`, `console-renderer.ts`) kept as a commented-out swap block in `index.ts`. `src/index.ts` is a thin composition root that takes an optional YouTube URL as its first CLI arg and wires host + tools + agent + renderer. The loop reaches the world only through two ports — an **Output** event stream and an injected **Input** `Host`, detailed under *Intended architecture* below — and stays UI-agnostic. Haiku is the dev model. The agent loop was built solid behind a plain console interface first; the Ink UI now sits on top, documented in `docs/plans/` (see *Design docs* below).
 
 ## Runtime & commands
 
@@ -42,7 +42,7 @@ The whole point of the design is a hard separation between the **agent loop** (t
 
 **Two ports keep the loop decoupled:**
 
-- **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`, `turnComplete`). The interface consumes them with `for await` and renders however it likes (console → stdout; Ink → React state).
+- **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`). The interface consumes them with `for await` and renders however it likes (console → stdout; Ink → React state).
 - **Input** — when the loop needs the next user turn or permission to run a tool, it `await`s a method on an injected `Host` port. The host owns both displaying the prompt and returning the answer.
 
 **Tools** live behind a separate `ToolRegistry` port (kept distinct from `Host` — human interaction vs. tool execution are different concerns). Timestamps everywhere — tool args and transcript output alike — are clock-formatted: `mm:ss` or `h:mm:ss`, optionally with fractional seconds (e.g. `0:45.2`).
@@ -54,9 +54,9 @@ The whole point of the design is a hard separation between the **agent loop** (t
 
 **Transcripts come from the video's existing captions** (manual or YouTube's automatic ones) via yt-dlp — they're instant, so there's no separate transcription step.
 
-## External tool dependencies (planned)
+## External tool dependencies
 
-The harness shells out to external binaries — these must be installed on the system:
+The harness shells out to external binaries — these must be installed on the system (Homebrew, so `/opt/homebrew/bin`):
 
 - **yt-dlp** — caption/transcript download
 - **ffmpeg** — frame extraction (`get_frames` seeks a `yt-dlp -g` stream URL with `-ss` before `-i` — HTTP range requests, no full-video download)
@@ -65,4 +65,8 @@ The harness shells out to external binaries — these must be installed on the s
 
 - `@anthropic-ai/sdk` — the model behind the loop
 - `zod` — tool input schemas, single source of truth: per tool define `const Input = z.object({...})` (`.describe()` for field docs), set `input_schema: z.toJSONSchema(Input) as Anthropic.Tool["input_schema"]`, and `Input.safeParse(input)` in `run` — never hand-write `input_schema`. Exception: an input-less tool may set `input_schema: { type: "object" }` directly — zod would only derive a trivial empty schema, and there's nothing to validate. Use Zod only at structured model/tool boundaries, not free-text parsing (SRT) or `/exit`-style command handling.
-- `ink` — terminal UI, added last on top of the solid loop
+- `ink` (+ `ink-text-input`, `react`) — terminal UI. Gotcha: `<Static>` memoizes on the `items` array *reference* — appends to `InkApp.lines` must create a fresh array (see `appendLine`); an in-place `push` makes new output silently vanish.
+
+## Design docs
+
+`docs/plans/` holds design/walkthrough docs with rationale and progress checkboxes (`ink-followups.md` is the live follow-up list). Check there before extending the Ink layer — decisions and gotchas are recorded with reasons.
