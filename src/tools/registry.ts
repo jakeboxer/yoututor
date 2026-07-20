@@ -3,6 +3,7 @@ import { createGetFramesTool } from "./get-frames.ts";
 import { createGetTranscriptRangeTool } from "./get-transcript-range.ts";
 import { createLoadVideoTool } from "./load-video.ts";
 import type { Tool } from "./tool.ts";
+import { normalizeResult } from "./tool-result-with-display.ts";
 import { createVideoStore } from "./video.ts";
 
 export function createToolRegistry(): ToolRegistry {
@@ -24,9 +25,9 @@ export function createToolRegistry(): ToolRegistry {
 		schemas: tools.map((tool) => tool.schema),
 		async run(name, input) {
 			const tool = byName.get(name);
-			if (!tool) return `Unknown tool: ${name}`;
+			if (!tool) return { result: `Unknown tool: ${name}` };
 
-			return tool.run(input);
+			return normalizeResult(await tool.run(input));
 		},
 	};
 }
