@@ -33,3 +33,7 @@ tmp/
 
 # Claude Code local notes
 .claude.local.md
+
+# Private notes (kept local, scrubbed from history)
+REVIEW.md
+SCOPE.md
