@@ -63,7 +63,7 @@ export default class Agent {
 			// assembling the full message behind the scenes so we can read it once the stream ends.
 			const stream = this.client.messages.stream({
 				model: MODEL,
-				max_tokens: 16000,
+				max_tokens: 64000,
 				system: SYSTEM_PROMPT,
 				tools: this.toolRegistry.schemas,
 				messages: this.messages,
