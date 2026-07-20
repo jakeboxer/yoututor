@@ -4,7 +4,7 @@
 
 A command-line tutor for YouTube videos. Give it a video URL, then ask questions about specific moments (*"at 4:30 they mention a 'commit graph', what does that look like?"*) and it answers using both the transcript around that timestamp and the actual video frames from that point.
 
-It's built as an agentic harness: rather than running a fixed pipeline, the model decides which tools to call for each question. A purely verbal question ("wait, what did they just say about X?") only needs the transcript; a question about something on screen pulls frames too — and it can fetch frames from a *different* timestamp than you asked at if the thing being explained was shown earlier.
+It's built as an agentic harness: rather than running a fixed pipeline, the model decides which tools to call for each question. For a purely verbal question ("what did they say about X at 0:45?"), the model can pull from the transcript. For a question about something on screen ("what does the diagram at 2:05 mean?"), the model may ask to download frames from the video around the specified timestamp.
 
 The terminal UI (built with [Ink](https://github.com/vadimdemedes/ink)) streams answers as rendered markdown, shows a spinner while tools run, and greets each loaded video with a color ASCII rendering of its thumbnail.
 
@@ -22,10 +22,10 @@ Then ask questions referencing timestamps as you watch; pasting a different link
 
 Both arguments are optional and can go in either order:
 
-- `<youtube-url>` — the video to tutor on. When given, the harness loads it before your first prompt by **fabricating the opening exchange**: it scripts a synthetic user message and a synthetic `load_video` tool call into the conversation, then runs the tool for real. Without a URL, the session starts videoless; paste a link into the chat and the model loads it itself.
-- `--console` — swap the Ink UI for a bare stdin/stdout loop (same agent underneath; see [Architecture](#architecture)).
+- `<youtube-url>`: the video to tutor on. When given, the harness loads it before your first prompt by **fabricating the opening exchange**: it scripts a synthetic user message and a synthetic `load_video` tool call into the conversation, then runs the tool for real. Without a URL, the session starts videoless; paste a link into the chat and the model loads it itself.
+- `--console`: swap the Ink UI for a bare stdin/stdout loop (same agent underneath; see [Architecture](#architecture)).
 
-The model is set in `src/agent/agent.ts` — it defaults to Haiku, which is plenty for grounded Q&A and keeps costs low.
+The model is set in `src/agent/agent.ts`. It defaults to Haiku, which is plenty for grounded Q&A and keeps costs low. Configurable model coming soon.
 
 ## Tools
 
@@ -60,8 +60,8 @@ The design goal is a clean separation between the **agent loop** (talk to the mo
 
 This works through two ports:
 
-- **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`). The interface consumes them with a `for await` and renders however it likes.
-- **Input** — when the loop needs the next user turn, it `await`s a method on an injected `Host` port. The host owns *displaying* the prompt as well as returning the answer, so the loop stays unaware of how input is gathered.
+- **Output**: the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`). The interface consumes them with a `for await` and renders however it likes.
+- **Input**: when the loop needs the next user turn, it `await`s a method on an injected `Host` port. The host owns *displaying* the prompt as well as returning the answer, so the loop stays unaware of how input is gathered.
 
 ```ts
 for await (const event of new Agent(host, createToolRegistry(), videoUrl).run()) {
@@ -69,9 +69,9 @@ for await (const event of new Agent(host, createToolRegistry(), videoUrl).run())
 }
 ```
 
-Capabilities (`load_video` / `get_transcript_range` / `get_frames`) live behind a separate `ToolRegistry` port, kept distinct from `Host` — human interaction and tool execution are different concerns.
+Capabilities (`load_video` / `get_transcript_range` / `get_frames`) live behind a third port: `ToolRegistry`.
 
-This allows the Ink UI and the bare console interface to be swapped into the same loop, switched with a CLI flag and zero changes to the core. I did this because I started this project before I'd learned Ink, and I wanted to focus purely on the agent loop before polishing the UI.
+This design allows the Ink UI and the bare console interface to be swapped into the same loop, switched with a CLI flag without any changes to the core agent logic. I did this because I started this project before I'd learned Ink, and I wanted to focus purely on the agent loop before polishing the UI.
 
 One detail of the event design: a tool result can carry a separate `display` artifact (such as ASCII thumbnail art) alongside the text result. The renderer prints the artifact, but the model only ever sees the text, so the artifact costs zero tokens.
 
