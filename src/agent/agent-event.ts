@@ -14,5 +14,7 @@ export type AgentEvent =
 	| { type: "toolRunStarted"; name: string; input: unknown }
 
 	// The tool finished. Carries a human-readable summary of the result (image blocks collapse to
-	// placeholders); the renderer decides how much to show.
-	| { type: "toolRunFinished"; name: string; result: string };
+	// placeholders); the renderer decides how much to show. `display` is presentation-ready art (e.g.
+	// an ASCII thumbnail) the renderer may print verbatim; it is never part of the conversation the
+	// model sees.
+	| { type: "toolRunFinished"; name: string; result: string; display?: string };
