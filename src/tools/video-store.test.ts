@@ -3,7 +3,7 @@ import { createVideoStore, type LoadedVideo } from "./video.ts";
 
 const goodVideo: LoadedVideo = {
 	ok: true,
-	metadata: { title: "Never Gonna Give You Up", description: "" },
+	metadata: { title: "Never Gonna Give You Up", description: "", thumbnailUrl: "" },
 	transcriptEntries: [{ start: 0, text: "We're no strangers to love." }],
 };
 

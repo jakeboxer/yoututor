@@ -36,6 +36,7 @@ const mockGetTranscriptRangeTool = createGetTranscriptRangeTool(
 		metadata: {
 			title: "Never Gonna Give You Up",
 			description: "The official video by Rick Astley.",
+			thumbnailUrl: "",
 		},
 		transcriptEntries: [entry1, entry2],
 	}),
