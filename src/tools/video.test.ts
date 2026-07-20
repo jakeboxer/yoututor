@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { parseSrt } from "./video.ts";
+import { deriveThumbnailUrl, parseSrt } from "./video.ts";
 
 const subtitle1 = `
 1
@@ -93,6 +93,22 @@ ${subtitle2}
   `.trim();
 
 	expect(parseSrt(srt)).toEqual([entry2]);
+});
+
+test("deriveThumbnailUrl: builds the mqdefault URL from the video id", () => {
+	expect(deriveThumbnailUrl("dQw4w9WgXcQ", "https://example.com/thumb.webp")).toEqual(
+		"https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+	);
+});
+
+test("deriveThumbnailUrl: falls back to the thumbnail field without an id", () => {
+	expect(deriveThumbnailUrl(undefined, "https://example.com/thumb.webp")).toEqual(
+		"https://example.com/thumb.webp",
+	);
+});
+
+test("deriveThumbnailUrl: empty when neither field is usable", () => {
+	expect(deriveThumbnailUrl(undefined, 42)).toEqual("");
 });
 
 test("parseSrt: subtitle with no timing info", () => {
