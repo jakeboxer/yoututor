@@ -141,6 +141,12 @@ export class InkApp implements Renderer, Host {
 
 			case "toolRunFinished":
 				this.activity = THINKING_LABEL;
+
+				// Art first, confirmation after, so the ✓ line reads as "this is what just loaded".
+				if (event.display !== undefined) {
+					this.appendLine({ kind: "art", text: event.display });
+				}
+
 				this.appendLine({ kind: "toolDone", text: `✓ ${event.name}` });
 				break;
 		}

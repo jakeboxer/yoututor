@@ -104,6 +104,39 @@ test("toolRunFinished displays properly", () => {
 	expect(lastFrame).not.toContain("Running get_frames");
 });
 
+test("toolRunFinished with display shows the art above the check line", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "toolRunStarted", name: "load_video", input: { url: "u" } });
+	app.handle({
+		type: "toolRunFinished",
+		name: "load_video",
+		result: "ok",
+		display: "##ART##\n#ROW2#",
+	});
+
+	// Compare line-by-line with includes(): the ⚙/✓ lines carry ANSI color codes when stdout is a
+	// TTY, so a contiguous multi-line substring match would fail there.
+	const lines = instance.lastFrame()?.split("\n") ?? [];
+	const doneIndex = lines.findIndex((line) => line.includes("✓ load_video"));
+
+	expect(doneIndex).toBeGreaterThanOrEqual(2);
+	expect(lines[doneIndex - 2]).toContain("##ART##");
+	expect(lines[doneIndex - 1]).toContain("#ROW2#");
+});
+
+test("toolRunFinished without display adds no art line", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "toolRunStarted", name: "load_video", input: { url: "u" } });
+	app.handle({ type: "toolRunFinished", name: "load_video", result: "ok" });
+
+	// The ✓ line lands directly under the ⚙ line — nothing (art or blank) in between.
+	const lines = instance.lastFrame()?.split("\n") ?? [];
+	const doneIndex = lines.findIndex((line) => line.includes("✓ load_video"));
+
+	expect(doneIndex).toBeGreaterThanOrEqual(1);
+	expect(lines[doneIndex - 1]).toContain('⚙ load_video {"url":"u"}');
+});
+
 test("prompt appears, input request promise is pending", async () => {
 	const { app, instance } = mountForTest();
 	let resolved = false;

@@ -91,19 +91,7 @@ export default class Agent {
 			const toolResults: Anthropic.ToolResultBlockParam[] = [];
 			for (const block of response.content) {
 				if (block.type === "tool_use") {
-					// Announce the run BEFORE executing, so a renderer can show progress while a slow tool
-					// is in flight.
-					yield { type: "toolRunStarted", name: block.name, input: block.input };
-
-					const result = await this.toolRegistry.run(block.name, block.input);
-
-					yield { type: "toolRunFinished", name: block.name, result: summarizeResult(result) };
-
-					toolResults.push({
-						type: "tool_result",
-						tool_use_id: block.id, // ties this result to the request it answers
-						content: result,
-					});
+					toolResults.push(yield* this.runTool(block.id, block.name, block.input));
 				}
 			}
 
@@ -134,15 +122,38 @@ export default class Agent {
 			content: [{ type: "tool_use", id: toolUseId, name: "load_video", input }],
 		});
 
-		// Run the tool for real and feed the result back — exactly as the loop does for a model-issued
-		// call, including the progress events, so a renderer shows the load happening.
-		yield { type: "toolRunStarted", name: "load_video", input };
-		const result = await this.toolRegistry.run("load_video", input);
-		yield { type: "toolRunFinished", name: "load_video", result: summarizeResult(result) };
-
+		// Run the tool for real and feed the result back. The shared runTool guarantees this behaves
+		// exactly like a model-issued call (progress events included), so a renderer shows the load
+		// happening.
 		this.messages.push({
 			role: "user",
-			content: [{ type: "tool_result", tool_use_id: toolUseId, content: result }],
+			content: [yield* this.runTool(toolUseId, "load_video", input)],
 		});
+	}
+
+	// Run one tool call: announce it, execute it, report it, and return the tool_result block the
+	// caller feeds back into the conversation. This is the ONLY place a tool's result/display fork
+	// happens: the display artifact (if any) is included in the finished event passed to the
+	// renderer, while just the pure tool call result goes into the returned block. This way, the
+	// model doesn't waste tokens on display artifacts like ASCII art.
+	private async *runTool(
+		id: string,
+		name: string,
+		input: unknown,
+	): AsyncGenerator<AgentEvent, Anthropic.ToolResultBlockParam> {
+		// Announce the run BEFORE executing, so a renderer can show progress while a slow tool (e.g. a
+		// real yt-dlp fetch) is in flight.
+		yield { type: "toolRunStarted", name, input };
+
+		const { result, display } = await this.toolRegistry.run(name, input);
+		yield {
+			type: "toolRunFinished",
+			name,
+			result: summarizeResult(result),
+			...(display === undefined ? {} : { display }),
+		};
+
+		// `id` ties this result back to the tool_use request it answers.
+		return { type: "tool_result", tool_use_id: id, content: result };
 	}
 }

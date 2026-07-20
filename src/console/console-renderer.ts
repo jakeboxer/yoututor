@@ -29,6 +29,10 @@ export class ConsoleRenderer implements Renderer {
 				console.log(`⚙ ${event.name} ${JSON.stringify(event.input)}`);
 				break;
 			case "toolRunFinished":
+				if (event.display !== undefined) {
+					console.log(event.display);
+				}
+
 				console.log(`✓ ${event.name}`);
 				break;
 		}

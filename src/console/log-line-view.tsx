@@ -7,6 +7,7 @@ export type LogLine = {
 		| "reply" // A block of reply text from the model.
 		| "toolStart" // The model started a tool call.
 		| "toolDone" // The model finished a tool call.
+		| "art" // Preformatted ASCII art (e.g. a thumbnail), rendered verbatim.
 		| "echo"; // The user's submitted input, echoed into the log.
 
 	// The text to show for the log line.
@@ -44,6 +45,8 @@ export default function LogLineView(props: { line: LogLine }) {
 			return <Text color="yellow">{props.line.text}</Text>;
 		case "toolDone":
 			return <Text color="green">{props.line.text}</Text>;
+		case "art":
+			return <Text>{props.line.text}</Text>;
 		case "echo":
 			return <Text dimColor>{props.line.text}</Text>;
 	}
