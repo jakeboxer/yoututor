@@ -1,8 +1,6 @@
 # YouTutor
 
-<p align="center">
-    <img src="screenshot.png" width="768" alt="Screenshot of YouTutor tutoring on Kurzgesagt's 'Black Holes Explained' video.">
-</p>
+![Screenshot of YouTutor tutoring on Kurzgesagt's 'Black Holes Explained' video.](screenshot.png)
 
 A command-line tutor for YouTube videos. Give it a video URL, then ask questions about specific moments (*"at 4:30 they mention a 'commit graph', what does that look like?"*) and it answers using both the transcript around that timestamp and the actual video frames from that point.
 
