@@ -11,7 +11,8 @@ export type TranscriptEntry = { start: number; text: string };
 
 // The video's basic metadata, pulled from yt-dlp's info JSON alongside the captions. Cheap
 // orientation for the model — what the video is — without any transcript text in the conversation.
-export type VideoMetadata = { title: string; description: string };
+// `thumbnailUrl` is display-only (ASCII art in the terminal, never sent to the model); "" = none.
+export type VideoMetadata = { title: string; description: string; thumbnailUrl: string };
 
 // The outcome of loading a video. On success: its metadata plus the parsed transcript lines. On
 // failure: a plain-English message explaining why (fetch failed, no captions) — the message the
@@ -166,16 +167,29 @@ async function readVideoMetadata(dir: string): Promise<VideoMetadata> {
 			infoPath = join(dir, name);
 			break;
 		}
-		if (!infoPath) return { title: "", description: "" };
+		if (!infoPath) return { title: "", description: "", thumbnailUrl: "" };
 
 		const info = JSON.parse(await Bun.file(infoPath).text());
 		return {
 			title: typeof info.title === "string" ? info.title : "",
 			description: typeof info.description === "string" ? info.description : "",
+			thumbnailUrl: deriveThumbnailUrl(info.id, info.thumbnail),
 		};
 	} catch {
-		return { title: "", description: "" };
+		return { title: "", description: "", thumbnailUrl: "" };
 	}
+}
+
+// Derive a thumbnail URL from the info JSON's untrusted fields.
+//
+// Prefer building the mqdefault URL from the video id: it's a 320x180 true-16:9 JPEG that always
+// exists. If there's no id, fall back to `thumbnail` (which is often WebP and (at hqdefault) 4:3
+// with letterbox bars). If there's no `thumbnail` either, fall back to "".
+export function deriveThumbnailUrl(id: unknown, thumbnail: unknown): string {
+	if (typeof id === "string" && id !== "") return `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+	if (typeof thumbnail === "string") return thumbnail;
+
+	return "";
 }
 
 // Turn an SRT file into transcript entries. An SRT block looks like:
