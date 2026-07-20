@@ -23,12 +23,27 @@ test("mount shows the activity indicator", () => {
 	expect(instance.lastFrame()).toContain("Thinking...");
 });
 
-test("textDelta event accumulates", () => {
+test("partial block is not displayed", () => {
 	const { app, instance } = mountForTest();
-	app.handle({ type: "textDelta", text: "text1" });
-	app.handle({ type: "textDelta", text: "text2" });
+	app.handle({ type: "textDelta", text: "streaming text" });
 
-	expect(instance.lastFrame()).toContain("text1text2");
+	expect(instance.lastFrame()).not.toContain("streaming text");
+});
+
+test("completed block appears before modelResponded", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "textDelta", text: "para one\n\n" });
+
+	expect(instance.lastFrame()).toContain("para one");
+	expect(instance.lastFrame()).toContain("Thinking...");
+});
+
+test("gap is added between consecutive reply blocks", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "textDelta", text: "para one\n\n" });
+	app.handle({ type: "textDelta", text: "para two\n\n" });
+
+	expect(instance.lastFrame()).toContain("para one\n\npara two");
 });
 
 test("modelResponded event moves the reply into the log", () => {
