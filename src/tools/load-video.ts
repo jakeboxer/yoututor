@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { type RenderThumbnailArt, renderThumbnailArt } from "./thumbnail-art.ts";
 import { formatTimestamp } from "./timestamp.ts";
 import type { Tool } from "./tool.ts";
 import type { VideoStore } from "./video.ts";
@@ -24,7 +25,11 @@ const Input = z.object({
 // deliberately DON'T return the transcript itself — that would bloat the context for the whole
 // session. Instead it returns light orientation (title, description, covered time span) and points
 // the model at get_transcript_range to read specific sections on demand.
-export function createLoadVideoTool(videoStore: VideoStore): Tool {
+// `renderArt` is injectable for tests; real callers use the default ffmpeg-backed converter.
+export function createLoadVideoTool(
+	videoStore: VideoStore,
+	renderArt: RenderThumbnailArt = renderThumbnailArt,
+): Tool {
 	return {
 		schema: {
 			name: "load_video",
@@ -64,7 +69,16 @@ export function createLoadVideoTool(videoStore: VideoStore): Tool {
 			const headline = `${heading}${span} Use get_transcript_range to read specific sections.`;
 
 			const blurb = truncateDescription(description);
-			return blurb ? `${headline}\n\nDescription:\n${blurb}` : headline;
+			const text = blurb ? `${headline}\n\nDescription:\n${blurb}` : headline;
+
+			// Best-effort garnish: ASCII art of the thumbnail, for the renderer only. Any failure
+			// (including a converter that throws) means no art — never a failed tool.
+			let display: string | undefined;
+			if (video.metadata.thumbnailUrl) {
+				display = await renderArt(video.metadata.thumbnailUrl).catch(() => undefined);
+			}
+
+			return display === undefined ? text : { result: text, display };
 		},
 	};
 }
