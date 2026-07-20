@@ -3,6 +3,7 @@ import TextInput from "ink-text-input";
 import { type ReactElement, useState } from "react";
 import type { AgentEvent } from "../agent/agent-event.ts";
 import type { Host } from "../agent/host.ts";
+import BlockBuffer from "./block-buffer.ts";
 import LogLineView, { type LogLine } from "./log-line-view.tsx";
 import type { Renderer } from "./renderer.ts";
 import Spinner from "./spinner.tsx";
@@ -14,7 +15,6 @@ type InkRender = (tree: ReactElement) => InkInstance;
 
 type AppViewProps = {
 	lines: LogLine[];
-	current: string;
 	awaitingInput: boolean;
 	activity: string;
 	onSubmit: (text: string) => void;
@@ -47,12 +47,11 @@ function AppView(props: AppViewProps) {
 				{(line, index) => <LogLineView key={index} line={line} />}
 			</Static>
 			<Box flexDirection="column">
-				{!props.awaitingInput && props.current === "" && (
+				{!props.awaitingInput && (
 					<Text dimColor>
 						<Spinner /> {props.activity}
 					</Text>
 				)}
-				{props.current !== "" && <Text>{props.current}</Text>}
 				{props.awaitingInput && (
 					<Box>
 						<Text>
@@ -84,7 +83,7 @@ export class InkApp implements Renderer, Host {
 	private ink: InkInstance;
 
 	private lines: LogLine[] = [];
-	private current = "";
+	private buffer = new BlockBuffer();
 
 	// Stashed when requestInput is called, resolved when the user sends input.
 	private inputResolver: ((value: string | null) => void) | null = null;
@@ -107,23 +106,27 @@ export class InkApp implements Renderer, Host {
 
 	handle(event: AgentEvent): void {
 		switch (event.type) {
-			// Write each chunk with no trailing newline, so the answer builds up on one line as it
-			// streams in.
-			case "textDelta":
-				this.current += event.text;
-				break;
+			// Add the text chunk to the block buffer and output any newly-completed blocks.
+			case "textDelta": {
+				const resultBlocks = this.buffer.push(event.text);
 
-			// Reply finished: append the streamed line to the list of previous lines so the next output
-			// (a tool line or the input prompt) starts fresh. No-op when the reply had no text (e.g a
-			// pure tool call).
-			case "modelResponded": {
-				const trimmedCurrent = this.current.trim();
-
-				if (trimmedCurrent !== "") {
-					this.appendLine({ kind: "reply", text: trimmedCurrent });
+				for (const block of resultBlocks) {
+					this.appendReplyBlock(block);
 				}
 
-				this.current = "";
+				break;
+			}
+
+			// Reply finished: flush the block buffer and treat any remaining text as the final block of
+			// the response.
+			case "modelResponded": {
+				const block = this.buffer.flush();
+
+				if (block !== null) {
+					this.appendReplyBlock(block);
+				}
+
+				this.buffer = new BlockBuffer();
 				break;
 			}
 
@@ -161,7 +164,6 @@ export class InkApp implements Renderer, Host {
 		return (
 			<AppView
 				lines={this.lines}
-				current={this.current}
 				awaitingInput={this.isAwaitingInput()}
 				activity={this.activity}
 				onSubmit={(text) => this.submitInput(text)}
@@ -214,5 +216,19 @@ export class InkApp implements Renderer, Host {
 
 	private appendLine(line: LogLine) {
 		this.lines = [...this.lines, line];
+	}
+
+	private appendReplyBlock(block: string) {
+		const logLine: LogLine = { kind: "reply", text: block };
+
+		const prev = this.lines[this.lines.length - 1];
+
+		// If there's another reply block above this one, add a gap between them so they aren't jammed
+		// together.
+		if (prev?.kind === "reply") {
+			logLine.gapAbove = true;
+		}
+
+		this.appendLine(logLine);
 	}
 }

@@ -1,42 +1,30 @@
 import { Text } from "ink";
 import { render as renderMarkdown } from "markdansi";
+import BlockBuffer from "./block-buffer.ts";
 
 export type LogLine = {
 	kind:
-		| "reply" // A full reply from the model.
+		| "reply" // A block of reply text from the model.
 		| "toolStart" // The model started a tool call.
 		| "toolDone" // The model finished a tool call.
 		| "echo"; // The user's submitted input, echoed into the log.
+
+	// The text to show for the log line.
 	text: string;
+
+	// Should a gap be shown above this log line?
+	// True for a "reply" log line that comes directly after another "reply" log line, so multiple
+	// reply blocks don't get jammed together.
+	gapAbove?: true;
 };
 
 function renderReply(markdown: string): string {
-	const blocks: string[] = [];
-	let current: string[] = [];
-	let inCodeFence = false;
+	const buffer = new BlockBuffer();
+	const blocks = buffer.push(markdown);
+	const trailingBlock = buffer.flush();
 
-	for (const line of markdown.split("\n")) {
-		// Keep track of whether or not we're in a code fence.
-		if (/^\s*(```|~~~)/.test(line)) {
-			inCodeFence = !inCodeFence;
-		}
-
-		if (!inCodeFence && line.trim() === "") {
-			// If we hit an empty line (and we're not in a code fence), add the current block to the list
-			// of blocks and start a new one.
-			if (current.length) {
-				blocks.push(current.join("\n"));
-			}
-
-			current = [];
-		} else {
-			// Add this line to the current block we're building up.
-			current.push(line);
-		}
-	}
-
-	if (current.length) {
-		blocks.push(current.join("\n"));
+	if (trailingBlock !== null) {
+		blocks.push(trailingBlock);
 	}
 
 	// Join the blocks into a single string. Each block is separated by a blank line.
@@ -46,7 +34,12 @@ function renderReply(markdown: string): string {
 export default function LogLineView(props: { line: LogLine }) {
 	switch (props.line.kind) {
 		case "reply":
-			return <Text>{renderReply(props.line.text)}</Text>;
+			return (
+				<Text>
+					{props.line.gapAbove ? "\n" : ""}
+					{renderReply(props.line.text)}
+				</Text>
+			);
 		case "toolStart":
 			return <Text color="yellow">{props.line.text}</Text>;
 		case "toolDone":
