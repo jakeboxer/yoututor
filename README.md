@@ -18,14 +18,14 @@ echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env   # Bun loads .env automatically
 bun src/index.ts "https://www.youtube.com/watch?v=..."
 ```
 
+Set `ANTHROPIC_MODEL` in `.env` to use a different model (defaults to `claude-haiku-4-5`).
+
 Then ask questions referencing timestamps as you watch; pasting a different link mid-session switches videos. Type `/exit` to quit.
 
 Both arguments are optional and can go in either order:
 
 - `<youtube-url>`: the video to tutor on. When given, the harness loads it before your first prompt by **fabricating the opening exchange**: it scripts a synthetic user message and a synthetic `load_video` tool call into the conversation, then runs the tool for real. Without a URL, the session starts videoless; paste a link into the chat and the model loads it itself.
 - `--console`: swap the Ink UI for a bare stdin/stdout loop (same agent underneath; see [Architecture](#architecture)).
-
-The model is set in `src/agent/agent.ts`. It defaults to Haiku, which is plenty for grounded Q&A and keeps costs low. Configurable model coming soon.
 
 ## Tools
 

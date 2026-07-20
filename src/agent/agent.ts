@@ -5,6 +5,9 @@ import type { Host } from "./host.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
 import type { ToolRegistry } from "./tool-registry.ts";
 
+// Overridable via .env alongside ANTHROPIC_API_KEY; Haiku is the dev default.
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
+
 export default class Agent {
 	private client = new Anthropic();
 
@@ -59,7 +62,7 @@ export default class Agent {
 			// what lets the model reply with a tool request instead of a final answer; the SDK keeps
 			// assembling the full message behind the scenes so we can read it once the stream ends.
 			const stream = this.client.messages.stream({
-				model: "claude-haiku-4-5",
+				model: MODEL,
 				max_tokens: 16000,
 				system: SYSTEM_PROMPT,
 				tools: this.toolRegistry.schemas,
