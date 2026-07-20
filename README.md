@@ -1,5 +1,7 @@
 # YouTutor
 
+<img src="screenshot.png" width="400" alt="Screenshot of YouTutor tutoring on Kurzgesagt's 'Black Holes Explained' video.">
+
 A command-line tutor for YouTube videos. Give it a video URL, then ask questions about specific moments (*"at 4:30 they mention a 'commit graph', what does that look like?"*) and it answers using both the transcript around that timestamp and the actual video frames from that point.
 
 It's built as an agentic harness: rather than running a fixed pipeline, the model decides which tools to call for each question. A purely verbal question ("wait, what did they just say about X?") only needs the transcript; a question about something on screen pulls frames too — and it can fetch frames from a *different* timestamp than you asked at if the thing being explained was shown earlier.
