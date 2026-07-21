@@ -86,9 +86,7 @@ One detail of the event design: a tool result can carry a separate `display` art
 ## Development
 
 ```sh
-bun test            # 98 tests: pure logic (SRT parsing, timestamps, range slicing),
-                    # tool contracts against a mocked store, and Ink rendering
+bun test
 bun run typecheck   # tsc --noEmit
 bun run lint        # Biome
-bun run dev         # watch mode
 ```
