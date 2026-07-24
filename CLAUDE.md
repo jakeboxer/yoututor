@@ -69,4 +69,4 @@ The harness shells out to external binaries — these must be installed on the s
 
 ## Design docs
 
-`docs/plans/` holds design/walkthrough docs with rationale and progress checkboxes (`ink-followups.md` is the live follow-up list). Check there before extending the Ink layer — decisions and gotchas are recorded with reasons.
+`docs/plans/` holds design docs with rationale: `someday.md` (deferred ideas/open questions with the reasoning recorded) and `agent-feature-ideas.md` (a tiered survey of candidate agent features). Check there before extending the agent loop or the Ink layer — decisions and gotchas are recorded with reasons.
