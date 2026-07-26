@@ -34,10 +34,20 @@ if (useConsole) {
 	renderer = ink;
 }
 
-// Drive the agent, handing each event to the renderer as it arrives.
-for await (const event of new Agent(host, createToolRegistry(), videoUrl).run()) {
-	renderer.handle(event);
+let failure: unknown;
+
+try {
+	// Drive the agent, handing each event to the renderer as it arrives.
+	for await (const event of new Agent(host, createToolRegistry(), videoUrl).run()) {
+		renderer.handle(event);
+	}
+} catch (err) {
+	failure = err;
+} finally {
+	// Give back the control the renderer took over the terminal (Ink's raw-mode stdin subscription).
+	renderer.unmount?.();
 }
 
-// Give back the control the renderer took over the terminal (Ink's raw-mode stdin subscription).
-renderer.unmount?.();
+if (failure !== undefined) {
+	throw failure;
+}
