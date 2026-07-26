@@ -144,7 +144,7 @@ export type ModelStreamStarter = (params: Anthropic.MessageStreamParams) => Mode
 - Constructor gains one default-injected param **after** `videoUrl` (existing call sites untouched): `modelStreamStarter: ModelStreamStarter = createAnthropicStreamStarter()`.
 - Slice 2's try/catch body swaps `this.client.messages.stream(...)` for `this.startModelStream(...)`; nothing else changes.
 
-### 3c. Test: `src/agent/agent.test.ts` (new)
+### 3c. Test: `src/agent/agent.test.ts` (new) — ✅ done 2026-07-26
 
 Spy-factory fakes in the `load-video.test.ts` style: `hostOf(...inputs)` (scripted `requestInput`, then `null`), stub `ToolRegistry` (`schemas: []`), `assistantMessage(text)` minimal `Anthropic.Message` literal (`stop_reason: "end_turn"`), `scriptedModelStreams(...script)` with entries `{ events, final }` / `{ failWith }` / `{ events, thenFailWith }`, returning `{ modelStreamStarter, calls }` (recorded params). Cases:
 
@@ -155,7 +155,7 @@ Spy-factory fakes in the `load-video.test.ts` style: `hostOf(...inputs)` (script
 
 No `index.ts` test (composition root, no repo precedent) — covered by the manual FAULT runs below.
 
-### Verify
+### Verify — ✅ done 2026-07-26
 
 1. `bun run typecheck` — watch `noUncheckedIndexedAccess` (if FAULT parsing indexes anything).
 2. `bun run lint`, then `bun test src/agent`.
