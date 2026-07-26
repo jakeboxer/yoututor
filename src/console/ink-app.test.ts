@@ -137,6 +137,22 @@ test("toolRunFinished without display adds no art line", () => {
 	expect(lines[doneIndex - 1]).toContain('⚙ load_video {"url":"u"}');
 });
 
+test("error event flushes the partial reply and appends the error line", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "textDelta", text: "half an ans" });
+	app.handle({ type: "error", message: "couldn't reach the model API" });
+
+	// Per-line asserts: the ✗ line carries ANSI color codes when colors are on, so a contiguous
+	// multi-line substring match would fail there.
+	const lines = instance.lastFrame()?.split("\n") ?? [];
+	const errorIndex = lines.findIndex((line) => line.includes("✗ couldn't reach the model API"));
+
+	// The partial text that arrived before the drop still gets shown, directly above the error.
+	expect(errorIndex).toBeGreaterThanOrEqual(1);
+	expect(lines[errorIndex - 1]).toContain("half an ans");
+	expect(instance.lastFrame()).toContain("Thinking...");
+});
+
 test("prompt appears, input request promise is pending", async () => {
 	const { app, instance } = mountForTest();
 	let resolved = false;

@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import type Anthropic from "@anthropic-ai/sdk";
 import { APIConnectionError, APIError } from "@anthropic-ai/sdk";
 import Agent from "./agent.ts";
-import { AgentError } from "./agent-error.ts";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import type { ModelStreamStarter } from "./model-stream.ts";
@@ -35,7 +34,7 @@ function textDeltaEvent(text: string): Anthropic.MessageStreamEvent {
 }
 
 // The smallest Anthropic.Message a scripted stream can resolve with: one text block, end_turn.
-function assistantMessage(text: string): Anthropic.Message {
+function finishedMessage(text: string): Anthropic.Message {
 	return {
 		id: "msg_scripted",
 		type: "message",
@@ -114,7 +113,7 @@ async function collect(run: AsyncGenerator<AgentEvent>) {
 test("agent: one turn streams text deltas and closes with modelResponded", async () => {
 	const { modelStreamStarter, calls } = scriptedModelSession({
 		events: [textDeltaEvent("Hel"), textDeltaEvent("lo.")],
-		final: assistantMessage("Hello."),
+		final: finishedMessage("Hello."),
 	});
 
 	const agent = new Agent(hostWithInputs("hi there"), noTools, undefined, modelStreamStarter);
@@ -130,37 +129,59 @@ test("agent: one turn streams text deltas and closes with modelResponded", async
 	expect(calls[0]?.messages.at(-1)).toEqual({ role: "user", content: "hi there" });
 });
 
-test("agent: an API error that escaped the SDK rejects run() with an AgentError", async () => {
+test("agent: an API error surfaces as an error event and the next turn recovers", async () => {
 	const rateLimited = apiError(429, "rate_limit_error", "Too many requests");
-	const { modelStreamStarter, calls } = scriptedModelSession({ failWith: rateLimited });
+	const { modelStreamStarter, calls } = scriptedModelSession(
+		{ failWith: rateLimited },
+		{ events: [textDeltaEvent("Hello.")], final: finishedMessage("Hello.") },
+	);
 
-	const agent = new Agent(hostWithInputs("hi"), noTools, undefined, modelStreamStarter);
+	const agent = new Agent(
+		hostWithInputs("hi", "try again"),
+		noTools,
+		undefined,
+		modelStreamStarter,
+	);
 	const { events, thrown } = await collect(agent.run());
 
-	expect(thrown).toBeInstanceOf(AgentError);
-	expect((thrown as AgentError).message).toContain("429");
-	expect((thrown as AgentError).cause).toBe(rateLimited);
+	// The failed turn yields error (no modelResponded); the second turn streams normally.
+	expect(thrown).toBeUndefined();
+	expect(events).toEqual([
+		{ type: "error", message: expect.stringContaining("429") },
+		{ type: "textDelta", text: "Hello." },
+		{ type: "modelResponded" },
+	]);
 
-	// The SDK's maxRetries is the only retry layer — the agent must not add attempts of its own.
-	expect(calls).toHaveLength(1);
-	expect(events).toBeEmpty();
+	// The SDK's maxRetries is the only retry layer — one call per turn, no attempts of the agent's
+	// own. The failed turn left history ending in a user turn, so the retry's request carries both
+	// user turns back-to-back (the API merges consecutive same-role messages).
+	expect(calls).toHaveLength(2);
+	expect(calls[1]?.messages).toEqual([
+		{ role: "user", content: "hi" },
+		{ role: "user", content: "try again" },
+	]);
 });
 
-test("agent: a mid-stream drop delivers the partial text, then an AgentError", async () => {
-	const { modelStreamStarter } = scriptedModelSession({
-		events: [textDeltaEvent("Half an ans"), textDeltaEvent("wer")],
-		thenFailWith: new APIConnectionError({ message: "Connection error." }),
-	});
+test("agent: a mid-stream drop delivers the partial text, then an error event, then recovers", async () => {
+	const { modelStreamStarter } = scriptedModelSession(
+		{
+			events: [textDeltaEvent("Half an ans"), textDeltaEvent("wer")],
+			thenFailWith: new APIConnectionError({ message: "Connection error." }),
+		},
+		{ events: [textDeltaEvent("Whole answer.")], final: finishedMessage("Whole answer.") },
+	);
 
-	const agent = new Agent(hostWithInputs("hi"), noTools, undefined, modelStreamStarter);
+	const agent = new Agent(hostWithInputs("hi", "again"), noTools, undefined, modelStreamStarter);
 	const { events, thrown } = await collect(agent.run());
 
+	expect(thrown).toBeUndefined();
 	expect(events).toEqual([
 		{ type: "textDelta", text: "Half an ans" },
 		{ type: "textDelta", text: "wer" },
+		{ type: "error", message: "couldn't reach the model API" },
+		{ type: "textDelta", text: "Whole answer." },
+		{ type: "modelResponded" },
 	]);
-	expect(thrown).toBeInstanceOf(AgentError);
-	expect((thrown as AgentError).message).toBe("couldn't reach the model API");
 });
 
 test("agent: a non-API error propagates raw, not wrapped in AgentError", async () => {
