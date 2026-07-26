@@ -35,6 +35,16 @@ export class ConsoleRenderer implements Renderer {
 
 				console.log(`✓ ${event.name}`);
 				break;
+			// The turn failed: close the streamed line first (a mid-stream drop leaves partial text
+			// unterminated), then report the error and let the loop return to the prompt.
+			case "error":
+				if (this.midLine) {
+					process.stdout.write("\n");
+					this.midLine = false;
+				}
+
+				console.log(`✗ ${event.message}`);
+				break;
 		}
 	}
 }

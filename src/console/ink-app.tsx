@@ -149,6 +149,21 @@ export class InkApp implements Renderer, Host {
 
 				this.appendLine({ kind: "toolDone", text: `✓ ${event.name}` });
 				break;
+
+			// The turn failed: flush the block buffer first (partial text that arrived before a
+			// mid-stream drop still gets shown), then report the error.
+			case "error": {
+				const block = this.buffer.flush();
+
+				if (block !== null) {
+					this.appendReplyBlock(block);
+				}
+
+				this.buffer = new BlockBuffer();
+				this.activity = THINKING_LABEL;
+				this.appendLine({ kind: "error", text: `✗ ${event.message}` });
+				break;
+			}
 		}
 
 		this.rerender();

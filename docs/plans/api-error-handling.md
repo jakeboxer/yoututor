@@ -198,13 +198,13 @@ private async *respondSafely(): AsyncGenerator<AgentEvent> {
 }
 ```
 
-### 4c. Renderers (modify all three files)
+### 4c. Renderers (modify all three files) — ✅ done 2026-07-26
 
 - `src/console/console-renderer.ts` — new case: close the streamed line first if `midLine` (a mid-stream drop leaves partial text unterminated), then print `✗ ${event.message}`.
 - `src/console/ink-app.tsx` — new case in `handle()`: flush the block buffer exactly like `modelResponded` (partial text that arrived before a mid-stream drop still gets shown), reset the buffer, reset `activity` to `THINKING_LABEL`, append `{ kind: "error", text: `✗ ${event.message}` }`.
 - `src/console/log-line-view.tsx` — add `"error"` to the `LogLine` kind union, rendered `<Text color="red">` (the switch is exhaustive under `noFallthroughCasesInSwitch`, so the compiler flags the missing case).
 
-### 4d. `src/index.ts` — no change
+### 4d. `src/index.ts` — no change — ✅ done 2026-07-26
 
 The `instanceof AgentError` branch stays as a backstop. Nothing should reach it once `run()` consumes AgentErrors, but it's two lines and keeps any future escape path clean.
 
