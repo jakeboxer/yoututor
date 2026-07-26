@@ -90,3 +90,11 @@ bun test
 bun run typecheck   # tsc --noEmit
 bun run lint        # Biome
 ```
+
+To manually test error handling, set `FAULT` to simulate a model-API failure that escaped the SDK's built-in retries. Only the first request fails; later requests go through normally.
+
+```sh
+FAULT=529 bun src/index.ts          # first model request fails with that status (any numeric code works)
+FAULT=conn bun src/index.ts         # connection error instead
+FAULT=midstream bun src/index.ts …  # a few real stream events, then a mid-stream connection drop
+```
