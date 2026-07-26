@@ -15,9 +15,11 @@ This is a **Bun** project (not Node). Always prefer Bun tooling — see `.cursor
 - Run: `bun src/index.ts`; `bun run dev` for watch mode; `bun --hot <file>` for hot reload
 - Install: `bun install` (never npm/pnpm/yarn)
 - Test: `bun test`; single file `bun test <path>`; single case `bun test -t "<name>"`
+- Ink UI tests: run with and without `FORCE_COLOR=3` (ANSI codes change frames); assert per-line with `toContain`, never a multi-line substring across colored lines.
 - Lint/format: `bunx biome check` (lint), `bunx biome format --write .` (format), `bunx biome check --write .` (fix). Configured in `biome.json`: tabs, `lineWidth` 100, double quotes, recommended rules + `correctness.useImportExtensions: error`.
 - Gotcha: `useImportExtensions` is a project-domain rule — `biome check`/`bun run lint` catch missing `.ts` extensions, but the Biome editor LSP won't flag them live. Rely on the CLI/pre-commit, not the editor squiggle.
 - Bun auto-loads `.env` (no dotenv). The Anthropic SDK will expect `ANTHROPIC_API_KEY` there.
+- `ANTHROPIC_MODEL` env var overrides the model (default: Haiku). `FAULT=<status|conn|midstream>` (dev-only, `src/agent/model-stream.ts`) makes the *first* model request fail then recovers — e.g. `FAULT=529 bun src/index.ts` to exercise error handling for real.
 - Prefer Bun built-ins over npm equivalents: `Bun.file` over `node:fs`, `Bun.$\`...\`` over execa/child_process, `Bun.serve()` over express.
 
 `package.json` scripts: `bun run dev` (watch), `bun run start`, `bun run typecheck` (`tsc --noEmit`), `bun run lint` (`biome check .`), `bun run test`.
@@ -42,7 +44,7 @@ The whole point of the design is a hard separation between the **agent loop** (t
 
 **Two ports keep the loop decoupled:**
 
-- **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`). The interface consumes them with `for await` and renders however it likes (console → stdout; Ink → React state).
+- **Output** — the loop is an async generator that `yield`s semantic events (`textDelta`, `modelResponded`, `toolRunStarted`, `toolRunFinished`, `error`). The interface consumes them with `for await` and renders however it likes (console → stdout; Ink → React state).
 - **Input** — when the loop needs the next user turn or permission to run a tool, it `await`s a method on an injected `Host` port. The host owns both displaying the prompt and returning the answer.
 
 **Tools** live behind a separate `ToolRegistry` port (kept distinct from `Host` — human interaction vs. tool execution are different concerns). Timestamps everywhere — tool args and transcript output alike — are clock-formatted: `mm:ss` or `h:mm:ss`, optionally with fractional seconds (e.g. `0:45.2`).

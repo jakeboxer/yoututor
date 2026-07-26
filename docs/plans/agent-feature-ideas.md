@@ -6,12 +6,12 @@ A survey of features that are common across mature agent harnesses (Claude Code,
 
 These are less "features" than hardening. Users only notice them when they're missing.
 
-- [ ] **API error handling & retries**
+- [x] **API error handling & retries**
   The SDK's built-in `maxRetries` backoff (429/5xx/408/409/connection errors, on the initial request) is the *only* retry layer, by design — an app-level retry-with-backoff loop around the stream was considered and rejected: it duplicates machinery the SDK already provides (sleep injection, backoff math, attempt caps) for marginal benefit. Anything that escapes the SDK — including a mid-stream drop, which it does not retry — is wrapped in a typed `AgentError` whose message is one human-readable sentence (`describeApiError`). Plan with full rationale: `api-error-handling.md`.
   - [x] Rely on SDK `maxRetries` for retryable errors; escaped errors (incl. mid-stream drops) → `AgentError` → clean unmount, one line to stderr, exit non-zero.
-  - [ ] `error` AgentEvent so failures surface in-session with the conversation intact, instead of exiting.
+  - [x] `error` AgentEvent so failures surface in-session with the conversation intact, instead of exiting.
 
-  *Lands in:* `agent-error.ts` (new), the try/catch in `agent.ts` `respond()`, and the `AgentError` branch in `index.ts`; the `error` event will touch `agent-event.ts` + the renderers.
+  *Lands in:* `agent-error.ts` (new), the try/catch in `agent.ts` `respond()` + the `respondSafely()` wrapper in `run()`, the `error` variant in `agent-event.ts`, the error cases in all three renderers (`console-renderer.ts`, `ink-app.tsx`, `log-line-view.tsx`), and the `AgentError` backstop in `index.ts`.
 
 - [ ] **Mid-turn abort (Esc to cancel)**
   Already recorded in `someday.md` with the design direction: AbortController plumbed through the loop, triggered by Esc, cancelling the in-flight model call or tool run and reprompting. Listed here because among mature agents this is table stakes — a long tool call (yt-dlp on a slow connection) with no way out is the most frustrating single interaction.

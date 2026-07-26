@@ -165,7 +165,7 @@ No `index.ts` test (composition root, no repo precedent) — covered by the manu
    - `FAULT=conn bun src/index.ts` → "couldn't reach the model API" variant.
    - `FAULT=midstream bun src/index.ts <url>` → partial text renders, then clean exit.
 
-## Slice 4 — surface errors in-session (`error` AgentEvent)
+## Slice 4 — surface errors in-session (`error` AgentEvent) — ✅ done 2026-07-26
 
 Final stage: an API failure prints an error line and returns to the prompt with the conversation intact, instead of exiting. Depends on slice 2; land after slice 3 (tests below use `scriptedModelStreams`, and `FAULT` runs are the manual verification).
 
@@ -208,7 +208,7 @@ private async *respondSafely(): AsyncGenerator<AgentEvent> {
 
 The `instanceof AgentError` branch stays as a backstop. Nothing should reach it once `run()` consumes AgentErrors, but it's two lines and keeps any future escape path clean.
 
-### 4e. Tests
+### 4e. Tests — ✅ done 2026-07-26
 
 Extend `src/agent/agent.test.ts` (slice 3's fakes):
 
@@ -218,11 +218,11 @@ Extend `src/agent/agent.test.ts` (slice 3's fakes):
 
 Extend the ink-app tests: an `error` event after partial `textDelta`s flushes the partial block and appends the red `✗` line. Per repo convention, verify with and without `FORCE_COLOR=3`, asserting per-line.
 
-### 4f. `docs/plans/agent-feature-ideas.md` (modify)
+### 4f. `docs/plans/agent-feature-ideas.md` (modify) — ✅ done 2026-07-26
 
 Tick the remaining `[ ]` child (`error` AgentEvent) *and* the top-level "API error handling & retries" box — this slice completes the entry. Update *Lands in:* to name `agent-event.ts` + the renderers.
 
-### Verify
+### Verify — ✅ done 2026-07-26
 
 1. `bun run typecheck`, `bun run lint`, `bun test`.
 2. Manual (both Ink and `--console`) — the injector faults only the *first* request, so recovery is directly observable:
