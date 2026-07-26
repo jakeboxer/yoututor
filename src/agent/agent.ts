@@ -30,7 +30,7 @@ export default class Agent {
 		// once the user shares a link.
 		if (this.videoUrl !== undefined) {
 			yield* this.seedLoadVideo(this.videoUrl);
-			yield* this.respond();
+			yield* this.respondSafely();
 		}
 
 		// Outer loop: keeps prompting the user for more input.
@@ -48,7 +48,21 @@ export default class Agent {
 
 			// Record the user's prompt, then let the model respond to it.
 			this.messages.push({ role: "user", content: prompt });
+			yield* this.respondSafely();
+		}
+	}
+
+	// AgentError is survivable. Announce it and return to the prompt. Anything else is a bug:
+	// propagate so index.ts's backstop prints the full stack after unmount.
+	private async *respondSafely(): AsyncGenerator<AgentEvent> {
+		try {
 			yield* this.respond();
+		} catch (err) {
+			if (err instanceof AgentError) {
+				yield { type: "error", message: err.message };
+			} else {
+				throw err;
+			}
 		}
 	}
 

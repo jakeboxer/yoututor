@@ -181,7 +181,7 @@ Final stage: an API failure prints an error line and returns to the prompt with 
 | { type: "error"; message: string }
 ```
 
-### 4b. `src/agent/agent.ts` (modify)
+### 4b. `src/agent/agent.ts` (modify) — ✅ done 2026-07-26
 
 Both `respond()` call sites in `run()` (post-seed and per-turn) go through a small wrapper; `respond()` itself is untouched:
 
