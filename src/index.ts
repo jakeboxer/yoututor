@@ -1,4 +1,5 @@
 import Agent from "./agent/agent.ts";
+import { AgentError } from "./agent/agent-error.ts";
 import type { Host } from "./agent/host.ts";
 import { consoleHost } from "./console/console-host.ts";
 import { ConsoleRenderer } from "./console/console-renderer.ts";
@@ -49,5 +50,13 @@ try {
 }
 
 if (failure !== undefined) {
-	throw failure;
+	// We use this instead of process.exit(1) to give the error output below time to flush.
+	process.exitCode = 1;
+
+	if (failure instanceof AgentError) {
+		// A known model-API failure: the message is already one readable sentence, no stack needed.
+		console.error(failure.message);
+	} else {
+		throw failure; // unexpected bug: full stack
+	}
 }
