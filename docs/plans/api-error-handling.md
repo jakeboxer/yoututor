@@ -116,10 +116,10 @@ Slices 1+2 complete the user-visible outcome, so update the entry now (not after
 
 Everything below is infrastructure for exercising the slice-2 try/catch under simulated faults. The only failure mode that *can't* be triggered for real is a mid-stream drop — that's the one thing this slice uniquely buys. On its own it could be skipped if the try/catch is trusted from the slice-2 manual runs; but slice 4 wants it in place first — the error-event tests need the injectable stream, so land 3 before 4.
 
-### 3a. `src/agent/open-model-stream.ts` (new) — port + production factory + fault injector
+### 3a. `src/agent/model-stream.ts` (new) — port + production factory + fault injector
 
 ```ts
-// What respond() consumes: the event stream plus the assembled final message.
+// What Agent.respond() consumes: the event stream plus the assembled final message.
 // The SDK's MessageStream satisfies this structurally.
 export type ModelStream = AsyncIterable<Anthropic.MessageStreamEvent> & {
 	finalMessage(): Promise<Anthropic.Message>;
