@@ -21,7 +21,7 @@ Today `respond()` in `src/agent/agent.ts` calls `client.messages.stream()` with 
 - `Anthropic.APIError.generate(status, errorBody, message, headers)` is public and returns the correct subclass — used by the `describeApiError` tests (slice 2) and the fault injector (slice 3) so `instanceof` classification is exercised for real.
 - `MessageStream implements AsyncIterable<MessageStreamEvent>` with `finalMessage(): Promise<Message>`; params type is `Anthropic.MessageStreamParams`.
 
-## Slice 1 — crash cleanly (`src/index.ts` only, ~10 lines)
+## Slice 1 — crash cleanly (`src/index.ts` only, ~10 lines) — ✅ done 2026-07-25
 
 Fixes the worst symptom on its own: a failure today leaves Ink holding raw-mode stdin and the terminal broken. No new files, no agent changes.
 
@@ -45,11 +45,11 @@ Unmount-before-print means Ink's final repaint can't clobber the error output. T
 
 **Verify** (both Ink and `--console`) — no injector needed, use a real failure: `ANTHROPIC_BASE_URL=http://127.0.0.1:9 bun src/index.ts` → SDK retries the connection error twice with backoff, then the escaped error prints *after* unmount; `echo $?` → non-zero; terminal echoes normally (raw mode released).
 
-## Slice 2 — typed error + readable message
+## Slice 2 — typed error + readable message — ✅ done 2026-07-25
 
 No injection: keep `private client = new Anthropic()` in `Agent` as-is.
 
-### 2a. `src/agent/agent-error.ts` (new)
+### 2a. `src/agent/agent-error.ts` (new) — ✅ done 2026-07-25
 
 ```ts
 export class AgentError extends Error { ... } // name = "AgentError"; cause carries the original
@@ -57,7 +57,7 @@ export class AgentError extends Error { ... } // name = "AgentError"; cause carr
 
 Plus `describeApiError(err: Anthropic.APIError): string` in the same file — one human sentence (status + API error message, e.g. "the model API rejected the request (status 529: overloaded_error)"; connection errors → "couldn't reach the model API"), no stack dump. It exists to format `AgentError` messages, so it lives with the class.
 
-### 2b. `src/agent/agent.ts` (modify)
+### 2b. `src/agent/agent.ts` (modify) — ✅ done 2026-07-25
 
 In `respond()`, wrap the stream-create → iterate → `finalMessage()` region:
 
@@ -80,7 +80,7 @@ try {
 
 Rest of `respond()` (history push, `modelResponded`, tool loop) unchanged.
 
-### 2c. `src/index.ts` (modify)
+### 2c. `src/index.ts` (modify) — ✅ done 2026-07-25
 
 Extend slice 1's tail so known failures print one line instead of a stack:
 
@@ -94,15 +94,15 @@ if (failure !== undefined) {
 
 `process.exitCode` over `process.exit()` so cleanup flushes; fall back to `process.exit(1)` only if manual testing shows the process lingering on stdin.
 
-### 2d. Test: `src/agent/agent-error.test.ts` (new)
+### 2d. Test: `src/agent/agent-error.test.ts` (new) — ✅ done 2026-07-25
 
 `describeApiError` on real SDK errors built with `APIError.generate` (429, 529, 400) and `new APIConnectionError(...)`: asserts the status/type appears and the string is one readable sentence. Needs no client and no `ANTHROPIC_API_KEY`.
 
-### 2e. `docs/plans/agent-feature-ideas.md` (modify — after this slice lands)
+### 2e. `docs/plans/agent-feature-ideas.md` (modify — after this slice lands) — ✅ done 2026-07-25
 
 Slices 1+2 complete the user-visible outcome, so update the entry now (not after slice 3). Don't tick the top-level "API error handling & retries" box. Follow the doc's nested-checkbox precedent (context-window entry): two children — `[x]` rely on SDK `maxRetries` for retryable errors; escaped errors (incl. mid-stream drops) → `AgentError` → clean unmount/stderr/exit; `[ ]` `error` AgentEvent so failures surface in-session instead of exiting. Reword the entry body to record the decision *against* an app-level retry loop (SDK backoff is the only retry layer). Update *Lands in:*.
 
-### Verify
+### Verify — ✅ done 2026-07-25
 
 1. `bun run typecheck` — watch `exactOptionalPropertyTypes` (AgentError options).
 2. `bun run lint` — catches missing `.ts` import extensions (editor LSP won't).
