@@ -3,7 +3,7 @@ import { $ } from "bun";
 // Renders a thumbnail URL as terminal ASCII art. Injectable so tool tests don't hit the network or
 // ffmpeg; real callers use the default renderThumbnailArt. Resolves undefined on any failure
 // (thumbnail art is garnish, so there's no error to report, just no art).
-export type RenderThumbnailArt = (thumbnailUrl: string) => Promise<string | undefined>;
+export type ThumbnailArtRenderer = (thumbnailUrl: string) => Promise<string | undefined>;
 
 // Dark-to-light glyphs; a pixel's brightness picks the glyph.
 const RAMP = " .:-=+*#%@";
@@ -82,7 +82,7 @@ export async function artFromImage(image: Uint8Array): Promise<string | undefine
 	return rgbToAscii(pixels, ART_WIDTH, ART_HEIGHT);
 }
 
-// The default RenderThumbnailArt: fetch the thumbnail and convert it. Never throws.
+// The default ThumbnailArtRenderer: fetch the thumbnail and convert it. Never throws.
 export async function renderThumbnailArt(thumbnailUrl: string): Promise<string | undefined> {
 	try {
 		const response = await fetch(thumbnailUrl);

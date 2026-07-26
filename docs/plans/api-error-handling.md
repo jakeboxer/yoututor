@@ -116,8 +116,6 @@ Slices 1+2 complete the user-visible outcome, so update the entry now (not after
 
 Everything below is infrastructure for exercising the slice-2 try/catch under simulated faults. The only failure mode that *can't* be triggered for real is a mid-stream drop — that's the one thing this slice uniquely buys. On its own it could be skipped if the try/catch is trusted from the slice-2 manual runs; but slice 4 wants it in place first — the error-event tests need the injectable stream, so land 3 before 4.
 
-**Naming:** the injected function type is `OpenModelStream` — a verb phrase like the existing `RenderThumbnailArt` — returning a `ModelStream`. (A `StreamModel`/`ModelStream` mirror pair was rejected as confusing.)
-
 ### 3a. `src/agent/open-model-stream.ts` (new) — port + production factory + fault injector
 
 ```ts
@@ -126,13 +124,13 @@ Everything below is infrastructure for exercising the slice-2 try/catch under si
 export type ModelStream = AsyncIterable<Anthropic.MessageStreamEvent> & {
 	finalMessage(): Promise<Anthropic.Message>;
 };
-// The model-call port. Injectable for tests; real callers use createAnthropicOpenModelStream().
-export type OpenModelStream = (params: Anthropic.MessageStreamParams) => ModelStream;
+// The model-call port. Injectable for tests; real callers use createAnthropicStreamStarter().
+export type ModelStreamStarter = (params: Anthropic.MessageStreamParams) => ModelStream;
 ```
 
-`createAnthropicOpenModelStream()`: builds `new Anthropic()` (comment noting the SDK's built-in `maxRetries: 2` backoff is the *only* retry layer, by design), returns `(params) => client.messages.stream(params)` — zero adapter code. Factory-in-default-param (not a module-level client) so tests that inject a fake never construct the real client or need `ANTHROPIC_API_KEY`. Mirrors the `createVideoStore(fetchVideo = fetchVideoWithYtDlp)` convention.
+`createAnthropicStreamStarter()`: builds `new Anthropic()` (comment noting the SDK's built-in `maxRetries: 2` backoff is the *only* retry layer, by design), returns `(params) => client.messages.stream(params)` — zero adapter code. Factory-in-default-param (not a module-level client) so tests that inject a fake never construct the real client or need `ANTHROPIC_API_KEY`. Mirrors the `createVideoStore(fetchVideo = fetchVideoWithYtDlp)` convention.
 
-**Fault injector (dev-only, same file, ~20 lines):** when `process.env.FAULT` is set, wrap the real `OpenModelStream` so the *first* request fails (simulating an error that escaped the SDK's retries), then delegate normally. `FAULT=<kind>`:
+**Fault injector (dev-only, same file, ~20 lines):** when `process.env.FAULT` is set, wrap the real `ModelStreamStarter` so the *first* request fails (simulating an error that escaped the SDK's retries), then delegate normally. `FAULT=<kind>`:
 
 - numeric (`400`, `429`, `529`, `500`…) → throw `Anthropic.APIError.generate(status, ...)` before iteration
 - `conn` → throw `new Anthropic.APIConnectionError({ message: ... })`
@@ -143,12 +141,12 @@ export type OpenModelStream = (params: Anthropic.MessageStreamParams) => ModelSt
 ### 3b. `src/agent/agent.ts` (modify)
 
 - Delete `private client = new Anthropic()`; keep the `Anthropic` import for types.
-- Constructor gains one default-injected param **after** `videoUrl` (existing call sites untouched): `openModelStream: OpenModelStream = createAnthropicOpenModelStream()`.
-- Slice 2's try/catch body swaps `this.client.messages.stream(...)` for `this.openModelStream(...)`; nothing else changes.
+- Constructor gains one default-injected param **after** `videoUrl` (existing call sites untouched): `modelStreamStarter: ModelStreamStarter = createAnthropicStreamStarter()`.
+- Slice 2's try/catch body swaps `this.client.messages.stream(...)` for `this.startModelStream(...)`; nothing else changes.
 
 ### 3c. Test: `src/agent/agent.test.ts` (new)
 
-Spy-factory fakes in the `load-video.test.ts` style: `hostOf(...inputs)` (scripted `requestInput`, then `null`), stub `ToolRegistry` (`schemas: []`), `assistantMessage(text)` minimal `Anthropic.Message` literal (`stop_reason: "end_turn"`), `scriptedModelStreams(...script)` with entries `{ events, final }` / `{ failWith }` / `{ events, thenFailWith }`, returning `{ openModelStream, calls }` (recorded params). Cases:
+Spy-factory fakes in the `load-video.test.ts` style: `hostOf(...inputs)` (scripted `requestInput`, then `null`), stub `ToolRegistry` (`schemas: []`), `assistantMessage(text)` minimal `Anthropic.Message` literal (`stop_reason: "end_turn"`), `scriptedModelStreams(...script)` with entries `{ events, final }` / `{ failWith }` / `{ events, thenFailWith }`, returning `{ modelStreamStarter, calls }` (recorded params). Cases:
 
 1. **Happy path** (baseline now that the client is injectable): one turn streams deltas → events contain `textDelta`s + `modelResponded`; `calls[0].messages` ends with the user turn.
 2. **API error before stream** (429 via `generate`) → `run()` rejects with `AgentError`, message contains the status, `cause` is the original, `calls.length === 1` (no app-level retry).

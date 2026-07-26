@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createLoadVideoTool } from "./load-video.ts";
-import type { RenderThumbnailArt } from "./thumbnail-art.ts";
+import type { ThumbnailArtRenderer } from "./thumbnail-art.ts";
 import type { LoadedVideo, VideoStore } from "./video.ts";
 
 // A store spy: records the URLs load() receives and always answers with `video`.
@@ -20,12 +20,12 @@ function storeSpy(video: LoadedVideo) {
 // An art spy: records the thumbnail URLs it's asked to render and always answers with `art`.
 function artSpy(art: string | undefined) {
 	const renderedUrls: string[] = [];
-	const renderArt: RenderThumbnailArt = (url) => {
+	const artRenderer: ThumbnailArtRenderer = (url) => {
 		renderedUrls.push(url);
 		return Promise.resolve(art);
 	};
 
-	return { renderedUrls, renderArt };
+	return { renderedUrls, artRenderer };
 }
 
 const loadedVideo: LoadedVideo = {
@@ -43,10 +43,10 @@ const loadedVideo: LoadedVideo = {
 
 test("load_video: passes the URL to the store and returns the headline", async () => {
 	const { loadedUrls, store } = storeSpy(loadedVideo);
-	const { renderArt } = artSpy(undefined);
+	const { artRenderer } = artSpy(undefined);
 
 	const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-	const actual = await createLoadVideoTool(store, renderArt).run({ url });
+	const actual = await createLoadVideoTool(store, artRenderer).run({ url });
 
 	expect(loadedUrls).toEqual([url]);
 	expect(actual).toContain('Loaded "Never Gonna Give You Up".');
@@ -56,9 +56,9 @@ test("load_video: passes the URL to the store and returns the headline", async (
 
 test("load_video: rendered art rides along as display, not in the result", async () => {
 	const { store } = storeSpy(loadedVideo);
-	const { renderedUrls, renderArt } = artSpy("##ART##");
+	const { renderedUrls, artRenderer } = artSpy("##ART##");
 
-	const actual = await createLoadVideoTool(store, renderArt).run({
+	const actual = await createLoadVideoTool(store, artRenderer).run({
 		url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 	});
 
@@ -71,9 +71,9 @@ test("load_video: rendered art rides along as display, not in the result", async
 
 test("load_video: no art means a plain string result with no display key", async () => {
 	const { store } = storeSpy(loadedVideo);
-	const { renderArt } = artSpy(undefined);
+	const { artRenderer } = artSpy(undefined);
 
-	const actual = await createLoadVideoTool(store, renderArt).run({
+	const actual = await createLoadVideoTool(store, artRenderer).run({
 		url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 	});
 
@@ -82,9 +82,9 @@ test("load_video: no art means a plain string result with no display key", async
 
 test("load_video: a throwing art renderer doesn't fail the tool", async () => {
 	const { store } = storeSpy(loadedVideo);
-	const renderArt: RenderThumbnailArt = () => Promise.reject(new Error("boom"));
+	const artRenderer: ThumbnailArtRenderer = () => Promise.reject(new Error("boom"));
 
-	const actual = await createLoadVideoTool(store, renderArt).run({
+	const actual = await createLoadVideoTool(store, artRenderer).run({
 		url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 	});
 
@@ -96,9 +96,9 @@ test("load_video: no thumbnail URL, no render attempt", async () => {
 		...loadedVideo,
 		metadata: { ...loadedVideo.metadata, thumbnailUrl: "" },
 	});
-	const { renderedUrls, renderArt } = artSpy("##ART##");
+	const { renderedUrls, artRenderer } = artSpy("##ART##");
 
-	await createLoadVideoTool(store, renderArt).run({
+	await createLoadVideoTool(store, artRenderer).run({
 		url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 	});
 
@@ -108,9 +108,9 @@ test("load_video: no thumbnail URL, no render attempt", async () => {
 test("load_video: relays a failed load's message without rendering art", async () => {
 	const message = "This video has no English captions available.";
 	const { store } = storeSpy({ ok: false, message });
-	const { renderedUrls, renderArt } = artSpy("##ART##");
+	const { renderedUrls, artRenderer } = artSpy("##ART##");
 
-	const actual = await createLoadVideoTool(store, renderArt).run({
+	const actual = await createLoadVideoTool(store, artRenderer).run({
 		url: "https://youtube.com/watch?v=x",
 	});
 
@@ -120,9 +120,9 @@ test("load_video: relays a failed load's message without rendering art", async (
 
 test("load_video: missing url is a validation error, not a crash", async () => {
 	const { loadedUrls, store } = storeSpy({ ok: false, message: "unused" });
-	const { renderArt } = artSpy(undefined);
+	const { artRenderer } = artSpy(undefined);
 
-	const actual = await createLoadVideoTool(store, renderArt).run({});
+	const actual = await createLoadVideoTool(store, artRenderer).run({});
 
 	expect(actual).toContain("load_video couldn't read its input");
 	expect(loadedUrls).toBeEmpty();

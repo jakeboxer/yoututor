@@ -11,7 +11,7 @@ import Spinner from "./spinner.tsx";
 // Custom types for Ink's render function and the parts of Ink's Instance type that we use so we can
 // mock them in tests.
 type InkInstance = Pick<Instance, "rerender" | "clear" | "unmount">;
-type InkRender = (tree: ReactElement) => InkInstance;
+type InkRenderer = (tree: ReactElement) => InkInstance;
 
 type AppViewProps = {
 	lines: LogLine[];
@@ -76,7 +76,7 @@ function AppView(props: AppViewProps) {
 //
 // By default, Ink handles the exit by just unmounting the UI, leaving the process stuck forever on
 // the pending requestInput promise.
-const defaultRender: InkRender = (tree) => render(tree, { exitOnCtrlC: false });
+const defaultRenderer: InkRenderer = (tree) => render(tree, { exitOnCtrlC: false });
 const THINKING_LABEL = "Thinking...";
 
 export class InkApp implements Renderer, Host {
@@ -90,18 +90,18 @@ export class InkApp implements Renderer, Host {
 
 	private activity = THINKING_LABEL;
 
-	private constructor(renderFn: InkRender) {
-		this.ink = renderFn(this.buildView());
+	private constructor(renderer: InkRenderer) {
+		this.ink = renderer(this.buildView());
 	}
 
 	/**
 	 * Mount the Ink app and render the initial empty view.
-	 * @param renderFn Function to use for rendering. Uses Ink's render() by default, but can be
+	 * @param renderer Function to use for rendering. Uses Ink's render() by default, but can be
 	 * overridden for testing.
 	 * @returns The mounted Ink app.
 	 */
-	static mount(renderFn: InkRender = defaultRender): InkApp {
-		return new InkApp(renderFn);
+	static mount(renderer: InkRenderer = defaultRenderer): InkApp {
+		return new InkApp(renderer);
 	}
 
 	handle(event: AgentEvent): void {
