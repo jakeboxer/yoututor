@@ -138,7 +138,7 @@ export type ModelStreamStarter = (params: Anthropic.MessageStreamParams) => Mode
 
 (No `:count` syntax — one injected failure is all we need: through slice 3 it ends the session; after slice 4 the first-fail-then-delegate shape is exactly right for watching the session *recover*.)
 
-### 3b. `src/agent/agent.ts` (modify)
+### 3b. `src/agent/agent.ts` (modify) — ✅ done 2026-07-26
 
 - Delete `private client = new Anthropic()`; keep the `Anthropic` import for types.
 - Constructor gains one default-injected param **after** `videoUrl` (existing call sites untouched): `modelStreamStarter: ModelStreamStarter = createAnthropicStreamStarter()`.

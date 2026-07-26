@@ -3,6 +3,7 @@ import { summarizeResult } from "../tools/tool-result.ts";
 import { AgentError, describeApiError } from "./agent-error.ts";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
+import { createAnthropicStreamStarter, type ModelStreamStarter } from "./model-stream.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
 import type { ToolRegistry } from "./tool-registry.ts";
 
@@ -10,8 +11,6 @@ import type { ToolRegistry } from "./tool-registry.ts";
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
 
 export default class Agent {
-	private client = new Anthropic();
-
 	// The running conversation. Each turn appends the user message and Claude's reply, so the model
 	// sees the full history on every request instead of just the latest line.
 	private messages: Anthropic.MessageParam[] = [];
@@ -20,6 +19,7 @@ export default class Agent {
 		private host: Host,
 		private toolRegistry: ToolRegistry,
 		private videoUrl?: string,
+		private startModelStream: ModelStreamStarter = createAnthropicStreamStarter(),
 	) {}
 
 	async *run(): AsyncGenerator<AgentEvent> {
@@ -65,7 +65,7 @@ export default class Agent {
 				// Stream the reply instead of waiting for the whole thing. Handing over `tools` is still
 				// what lets the model reply with a tool request instead of a final answer; the SDK keeps
 				// assembling the full message behind the scenes so we can read it once the stream ends.
-				const stream = this.client.messages.stream({
+				const stream = this.startModelStream({
 					model: MODEL,
 					max_tokens: 64000,
 					system: SYSTEM_PROMPT,
