@@ -173,7 +173,7 @@ Final stage: an API failure prints an error line and returns to the prompt with 
 
 **Not in scope:** no retry-ability classification. A permanent failure (bad key → 401) surfaces the same as a transient 529 and will just fail again on retry; the message names the status, and the user can `/exit`. Distinguishing "worth retrying" from "give up" isn't worth the machinery for a tutor CLI.
 
-### 4a. `src/agent/agent-event.ts` (modify)
+### 4a. `src/agent/agent-event.ts` (modify) — ✅ done 2026-07-26
 
 ```ts
 // The model call failed after the SDK's retries. The turn is abandoned; the loop returns to the

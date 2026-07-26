@@ -17,4 +17,8 @@ export type AgentEvent =
 	// placeholders); the renderer decides how much to show. `display` is presentation-ready art (e.g.
 	// an ASCII thumbnail) the renderer may print verbatim; it is never part of the conversation the
 	// model sees.
-	| { type: "toolRunFinished"; name: string; result: string; display?: string };
+	| { type: "toolRunFinished"; name: string; result: string; display?: string }
+
+	// The model call failed after the SDK's retries. The turn is abandoned and the loop returns to
+	// the prompt with the conversation intact. The renderer should show the message and carry on.
+	| { type: "error"; message: string };
