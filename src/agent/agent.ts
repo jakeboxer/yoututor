@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { summarizeResult } from "../tools/tool-result.ts";
+import { AgentError, describeApiError } from "./agent-error.ts";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
@@ -58,28 +59,41 @@ export default class Agent {
 		// One turn may take several round-trips with the model. It might call a tool, read the result,
 		// then answer (or answer directly). We loop until the reply is a final answer.
 		while (true) {
-			// Stream the reply instead of waiting for the whole thing. Handing over `tools` is still
-			// what lets the model reply with a tool request instead of a final answer; the SDK keeps
-			// assembling the full message behind the scenes so we can read it once the stream ends.
-			const stream = this.client.messages.stream({
-				model: MODEL,
-				max_tokens: 64000,
-				system: SYSTEM_PROMPT,
-				tools: this.toolRegistry.schemas,
-				messages: this.messages,
-			});
+			let response: Anthropic.Message;
 
-			// Emit each chunk of answer text the moment it arrives. We stream ONLY text — a tool call's
-			// input arrives as partial JSON, which we'd rather read fully-formed from finalMessage().
-			for await (const event of stream) {
-				if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-					yield { type: "textDelta", text: event.delta.text };
+			try {
+				// Stream the reply instead of waiting for the whole thing. Handing over `tools` is still
+				// what lets the model reply with a tool request instead of a final answer; the SDK keeps
+				// assembling the full message behind the scenes so we can read it once the stream ends.
+				const stream = this.client.messages.stream({
+					model: MODEL,
+					max_tokens: 64000,
+					system: SYSTEM_PROMPT,
+					tools: this.toolRegistry.schemas,
+					messages: this.messages,
+				});
+
+				// Emit each chunk of answer text the moment it arrives. We stream ONLY text — a tool call's
+				// input arrives as partial JSON, which we'd rather read fully-formed from finalMessage().
+				for await (const event of stream) {
+					if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+						yield { type: "textDelta", text: event.delta.text };
+					}
 				}
+
+				// The SDK assembled the whole reply from the stream. Use it for history and control flow
+				// (text blocks, tool_use blocks, stop_reason).
+				response = await stream.finalMessage();
+			} catch (err) {
+				// We only end up here if the model SDK used up its maxRetries (or if the failure was
+				// un-retryable).
+				if (err instanceof Anthropic.APIError) {
+					throw new AgentError(describeApiError(err), { cause: err });
+				}
+
+				throw err; // unexpected bug: propagate raw with stack
 			}
 
-			// The SDK assembled the whole reply from the stream — the same shape create() returns. Use
-			// it for history and control flow (text blocks, tool_use blocks, stop_reason).
-			const response = await stream.finalMessage();
 			this.messages.push({ role: "assistant", content: response.content });
 
 			// Signal the reply is complete, so a renderer can close the streamed line of text.
