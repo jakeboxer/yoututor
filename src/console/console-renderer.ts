@@ -35,6 +35,15 @@ export class ConsoleRenderer implements Renderer {
 
 				console.log(`✓ ${event.name}`);
 				break;
+			case "stats":
+				console.log(
+					`tokens: ` +
+						`input ${event.usage.input} · ` +
+						`output ${event.usage.output} · ` +
+						`cache read ${event.usage.cacheRead} · ` +
+						`cache write ${event.usage.cacheWrite}`,
+				);
+				break;
 			// The turn failed: close the streamed line first (a mid-stream drop leaves partial text
 			// unterminated), then report the error and let the loop return to the prompt.
 			case "error":
