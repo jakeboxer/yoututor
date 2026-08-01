@@ -217,6 +217,18 @@ test("empty submit does not resolve", async () => {
 	).toBe(1);
 });
 
+test("stats event", () => {
+	const { app, instance } = mountForTest();
+	app.handle({ type: "stats", usage: { input: 105, output: 17, cacheRead: 90, cacheWrite: 20 } });
+
+	const lastFrame = instance.lastFrame();
+	expect(lastFrame).toContain("tokens:");
+	expect(lastFrame).toContain("input 105");
+	expect(lastFrame).toContain("output 17");
+	expect(lastFrame).toContain("cache read 90");
+	expect(lastFrame).toContain("cache write 20");
+});
+
 test("Ctrl+D while awaiting input resolves null", async () => {
 	const { app, instance } = mountForTest();
 	const input = app.requestInput();
