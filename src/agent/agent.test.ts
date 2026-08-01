@@ -187,6 +187,45 @@ test("agent: no stale cache_control markers", async () => {
 	});
 });
 
+test("agent: /stats command", async () => {
+	const { modelStreamStarter, calls } = scriptedModelSession(
+		{
+			events: [],
+
+			// Cache fields left null to exercise the code path where they're missing from the response.
+			final: finishedMessage("Response to one.", { input_tokens: 100, output_tokens: 10 }),
+		},
+		{
+			events: [],
+			final: finishedMessage("Response to two.", {
+				input_tokens: 5,
+				output_tokens: 7,
+				cache_read_input_tokens: 90,
+				cache_creation_input_tokens: 20,
+			}),
+		},
+	);
+
+	const agent = new Agent(
+		hostWithInputs("one", "two", "/stats"),
+		noTools,
+		undefined,
+		modelStreamStarter,
+	);
+	const { events, thrown } = await collect(agent.run());
+
+	expect(thrown).toBeUndefined();
+
+	// Stats event accumulates accurately.
+	expect(events.at(-1)).toEqual({
+		type: "stats",
+		usage: { input: 105, output: 17, cacheRead: 90, cacheWrite: 20 },
+	});
+
+	// /stats never reached the model.
+	expect(calls).toHaveLength(2);
+});
+
 test("agent: an API error surfaces as an error event and the next turn recovers", async () => {
 	const rateLimited = apiError(429, "rate_limit_error", "Too many requests");
 	const { modelStreamStarter, calls } = scriptedModelSession(
