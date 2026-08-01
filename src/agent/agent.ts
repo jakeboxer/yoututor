@@ -82,8 +82,10 @@ export default class Agent {
 				const stream = this.startModelStream({
 					model: MODEL,
 					max_tokens: 64000,
-					system: SYSTEM_PROMPT,
 					tools: this.toolRegistry.schemas,
+					// System prompt is rendered after tool schemas, so adding a cache_control breakpoint here
+					// causes both to be cached.
+					system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
 					messages: this.messages,
 				});
 
