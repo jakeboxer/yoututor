@@ -1,6 +1,8 @@
+// Stats about the agent's token usage.
+export type UsageTotals = { input: number; output: number; cacheRead: number; cacheWrite: number };
+
 // Semantic events the loop emits. A renderer consumes these and decides how to display them.
 // Add new variants as the loop grows.
-
 export type AgentEvent =
 	// A chunk of the model's answer text, streamed as it's generated (not the whole answer at once).
 	| { type: "textDelta"; text: string }
@@ -18,6 +20,13 @@ export type AgentEvent =
 	// an ASCII thumbnail) the renderer may print verbatim; it is never part of the conversation the
 	// model sees.
 	| { type: "toolRunFinished"; name: string; result: string; display?: string }
+
+	// An updated set of stats for the model. Emitted when the user runs the /stats command. For now,
+	// just contains stats about token usage.
+	| {
+			type: "stats";
+			usage: UsageTotals;
+	  }
 
 	// The model call failed after the SDK's retries. The turn is abandoned and the loop returns to
 	// the prompt with the conversation intact. The renderer should show the message and carry on.

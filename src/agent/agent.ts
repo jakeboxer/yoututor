@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { summarizeResult } from "../tools/tool-result.ts";
 import { AgentError, describeApiError } from "./agent-error.ts";
-import type { AgentEvent } from "./agent-event.ts";
+import type { AgentEvent, UsageTotals } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import { createAnthropicStreamStarter, type ModelStreamStarter } from "./model-stream.ts";
 import SYSTEM_PROMPT from "./system-prompt.ts";
@@ -50,6 +50,9 @@ export default class Agent {
 	// sees the full history on every request instead of just the latest line.
 	private messages: Anthropic.MessageParam[] = [];
 
+	// Stats about the agent's token usage so far.
+	private usageTotals: UsageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
 	constructor(
 		private host: Host,
 		private toolRegistry: ToolRegistry,
@@ -77,6 +80,14 @@ export default class Agent {
 			// Exit by typing "/exit".
 			const prompt = userInput.trim();
 			if (prompt === "/exit") break;
+
+			// View stats by typing "/stats".
+			if (prompt === "/stats") {
+				// We copy usageTotals into a new object because it's meant to represent a snapshot. If the
+				// renderer caches the result, we don't want it live-updating unexpectedly.
+				yield { type: "stats", usage: { ...this.usageTotals } };
+				continue;
+			}
 
 			// Skip blank lines. The Anthropic API rejects empty message content.
 			if (prompt === "") continue;
@@ -144,6 +155,12 @@ export default class Agent {
 
 				throw err; // unexpected bug: propagate raw with stack
 			}
+
+			// Update usage totals.
+			this.usageTotals.input += response.usage.input_tokens;
+			this.usageTotals.output += response.usage.output_tokens;
+			this.usageTotals.cacheRead += response.usage.cache_read_input_tokens ?? 0;
+			this.usageTotals.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
 
 			this.messages.push({ role: "assistant", content: response.content });
 
