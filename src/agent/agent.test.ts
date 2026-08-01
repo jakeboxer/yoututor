@@ -149,6 +149,35 @@ test("agent: one turn streams text deltas and closes with modelResponded", async
 	});
 });
 
+test("agent: no stale cache_control markers", async () => {
+	const { modelStreamStarter, calls } = scriptedModelSession(
+		{ events: [], final: finishedMessage("Response to one.") },
+		{ events: [], final: finishedMessage("Response to two.") },
+	);
+
+	const agent = new Agent(hostWithInputs("one", "two"), noTools, undefined, modelStreamStarter);
+	const { thrown } = await collect(agent.run());
+
+	expect(thrown).toBeUndefined();
+	expect(calls).toHaveLength(2);
+	expect(calls[1]?.messages).toHaveLength(3);
+
+	// Message 0 is a plain string, no stale cache marker.
+	expect(calls[1]?.messages[0]).toEqual({ role: "user", content: "one" });
+
+	// Message 1 is the agent's response, no stale cache marker.
+	expect(calls[1]?.messages[1]).toEqual({
+		role: "assistant",
+		content: [{ type: "text", text: "Response to one.", citations: null }],
+	});
+
+	// Message 2 is a wrapped string. It has a cache marker because it's the call's last message.
+	expect(calls[1]?.messages[2]).toEqual({
+		role: "user",
+		content: [{ type: "text", text: "two", cache_control: { type: "ephemeral" } }],
+	});
+});
+
 test("agent: an API error surfaces as an error event and the next turn recovers", async () => {
 	const rateLimited = apiError(429, "rate_limit_error", "Too many requests");
 	const { modelStreamStarter, calls } = scriptedModelSession(
