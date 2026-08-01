@@ -223,10 +223,11 @@ test("stats event", () => {
 
 	const lastFrame = instance.lastFrame();
 	expect(lastFrame).toContain("tokens:");
-	expect(lastFrame).toContain("input 105");
-	expect(lastFrame).toContain("output 17");
-	expect(lastFrame).toContain("cache read 90");
+	expect(lastFrame).toContain("input 215"); // 105 uncached + 20 cache write + 90 cache read
+	expect(lastFrame).toContain("uncached 105");
 	expect(lastFrame).toContain("cache write 20");
+	expect(lastFrame).toContain("cache read 90");
+	expect(lastFrame).toContain("output 17");
 });
 
 test("Ctrl+D while awaiting input resolves null", async () => {

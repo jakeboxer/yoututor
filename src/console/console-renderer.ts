@@ -35,13 +35,17 @@ export class ConsoleRenderer implements Renderer {
 
 				console.log(`✓ ${event.name}`);
 				break;
+			// The API's `input` counter is only the uncached remainder, so the headline input number is
+			// the sum of all three input-side buckets. Cache write before read: tokens are written on
+			// the request that first sends them, read back on the requests after.
 			case "stats":
 				console.log(
 					`tokens: ` +
-						`input ${event.usage.input} · ` +
-						`output ${event.usage.output} · ` +
-						`cache read ${event.usage.cacheRead} · ` +
-						`cache write ${event.usage.cacheWrite}`,
+						`input ${event.usage.input + event.usage.cacheWrite + event.usage.cacheRead} ` +
+						`(uncached ${event.usage.input} · ` +
+						`cache write ${event.usage.cacheWrite} · ` +
+						`cache read ${event.usage.cacheRead}) · ` +
+						`output ${event.usage.output}`,
 				);
 				break;
 			// The turn failed: close the streamed line first (a mid-stream drop leaves partial text

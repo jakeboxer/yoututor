@@ -150,14 +150,18 @@ export class InkApp implements Renderer, Host {
 				this.appendLine({ kind: "toolDone", text: `✓ ${event.name}` });
 				break;
 
+			// The API's `input` counter is only the uncached remainder, so the headline input number is
+			// the sum of all three input-side buckets. Cache write before read: tokens are written on
+			// the request that first sends them, read back on the requests after.
 			case "stats":
 				this.appendLine({
 					kind: "stats",
 					text:
-						`tokens: input ${event.usage.input} · ` +
-						`output ${event.usage.output} · ` +
-						`cache read ${event.usage.cacheRead} · ` +
-						`cache write ${event.usage.cacheWrite}`,
+						`tokens: input ${event.usage.input + event.usage.cacheWrite + event.usage.cacheRead} ` +
+						`(uncached ${event.usage.input} · ` +
+						`cache write ${event.usage.cacheWrite} · ` +
+						`cache read ${event.usage.cacheRead}) · ` +
+						`output ${event.usage.output}`,
 				});
 				break;
 
