@@ -150,6 +150,17 @@ export class InkApp implements Renderer, Host {
 				this.appendLine({ kind: "toolDone", text: `✓ ${event.name}` });
 				break;
 
+			case "stats":
+				this.appendLine({
+					kind: "stats",
+					text:
+						`tokens: input ${event.usage.input} · ` +
+						`output ${event.usage.output} · ` +
+						`cache read ${event.usage.cacheRead} · ` +
+						`cache write ${event.usage.cacheWrite}`,
+				});
+				break;
+
 			// The turn failed: flush the block buffer first (partial text that arrived before a
 			// mid-stream drop still gets shown), then report the error.
 			case "error": {

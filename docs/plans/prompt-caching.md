@@ -31,7 +31,7 @@ Max 4 breakpoints per request; we use 2.
 
 ### 1. This doc — ✅ done 2026-07-31
 
-### 2. System prompt breakpoint — `src/agent/agent.ts`
+### 2. System prompt breakpoint — `src/agent/agent.ts` — ✅ done 2026-08-01
 
 In `respond()`'s request construction, change `system: SYSTEM_PROMPT` to the array form:
 
@@ -41,7 +41,7 @@ system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral"
 
 One line; caches tools + system together (once over the model's minimum).
 
-### 3. Last-message breakpoint — `src/agent/agent.ts`
+### 3. Last-message breakpoint — `src/agent/agent.ts` — ✅ done 2026-08-01
 
 A module-level helper (below the `MODEL` constant is a natural spot) that returns a copy of the messages with a marker on the very last content block — no mutation of the input:
 
@@ -51,14 +51,14 @@ A module-level helper (below the `MODEL` constant is a natural spot) that return
 
 Call it in the request: `messages: withCacheBreakpoint(this.messages)` (name is Jake's call). The non-mutation property is the thing the tests pin down.
 
-### 4. Usage totals + `stats` event — `src/agent/agent-event.ts`, `src/agent/agent.ts`
+### 4. Usage totals + `stats` event — `src/agent/agent-event.ts`, `src/agent/agent.ts` — ✅ done 2026-08-01
 
 - New `AgentEvent` variant (doc comment in the file's style):
   `{ type: "stats"; usage: { input: number; output: number; cacheRead: number; cacheWrite: number } }`
 - `Agent` gains a private totals object with the same four counters. After `stream.finalMessage()` resolves, add `response.usage`'s four fields into it (`?? 0` for the nullable cache fields). This sits inside the tool-loop `while`, so multi-trip turns count every request.
 - In `run()`, after the `/exit` check: `/stats` yields the `stats` event with the current totals and `continue`s — no message push, no model call. Plain string handling, per the feature doc's slash-command note (no command table yet at two commands).
 
-### 5. Render it — `src/console/console-renderer.ts`, `src/console/ink-app.tsx`, `src/console/log-line-view.tsx`
+### 5. Render it — `src/console/console-renderer.ts`, `src/console/ink-app.tsx`, `src/console/log-line-view.tsx` — ✅ done 2026-08-01
 
 Renderers silently ignore unknown events (no `default` in the switches), so both need a case:
 

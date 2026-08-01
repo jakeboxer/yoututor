@@ -9,6 +9,7 @@ export type LogLine = {
 		| "toolDone" // The model finished a tool call.
 		| "art" // Preformatted ASCII art (e.g. a thumbnail), rendered verbatim.
 		| "echo" // The user's submitted input, echoed into the log.
+		| "stats" // The user requested stats about the session.
 		| "error"; // The model call failed; the turn was abandoned.
 
 	// The text to show for the log line.
@@ -49,6 +50,8 @@ export default function LogLineView(props: { line: LogLine }) {
 		case "art":
 			return <Text>{props.line.text}</Text>;
 		case "echo":
+			return <Text dimColor>{props.line.text}</Text>;
+		case "stats":
 			return <Text dimColor>{props.line.text}</Text>;
 		case "error":
 			return <Text color="red">{props.line.text}</Text>;
