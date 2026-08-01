@@ -67,7 +67,20 @@ type ScriptedModelResult =
 	// A stream that dies after yielding some events
 	| { events: Anthropic.MessageStreamEvent[]; thenFailWith: unknown };
 
-// A starter spy: plays one script entry per model call and records every params object it gets.
+/**
+ * A starter spy: plays one script entry per model call and records every params object it gets.
+ *
+ * @param script One entry per expected model request, in order: request N gets script[N] as its
+ * outcome (stream events + final message, or a scripted failure). A request beyond the script's
+ * length throws — an unscripted model call is a test bug.
+ * @returns `modelStreamStarter` to inject into the Agent, and `calls` — the request log. Each entry
+ * is the full params object the agent sent for one model request (model, system, tools, messages),
+ * appended at request time. `calls.length` is the number of model requests made; `calls[N]` is what
+ * request N looked like on the wire — e.g. where cache_control markers sat. The `messages` array is
+ * snapshotted at request time because the agent passes its live history array and keeps pushing to
+ * it afterward; without the copy, every entry would show the final history instead of the history
+ * as that request saw it.
+ */
 function scriptedModelSession(...script: ScriptedModelResult[]) {
 	const calls: Anthropic.MessageStreamParams[] = [];
 
