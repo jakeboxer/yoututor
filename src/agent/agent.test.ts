@@ -5,6 +5,7 @@ import Agent from "./agent.ts";
 import type { AgentEvent } from "./agent-event.ts";
 import type { Host } from "./host.ts";
 import type { ModelStreamStarter } from "./model-stream.ts";
+import SYSTEM_PROMPT from "./system-prompt.ts";
 import type { ToolRegistry } from "./tool-registry.ts";
 
 // A host spy: hands out the scripted inputs one per request, then null (EOF) ends the session.
@@ -139,6 +140,9 @@ test("agent: one turn streams text deltas and closes with modelResponded", async
 		{ type: "modelResponded" },
 	]);
 	expect(calls).toHaveLength(1);
+	expect(calls[0]?.system).toEqual([
+		{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+	]);
 	expect(calls[0]?.messages.at(-1)).toEqual({
 		role: "user",
 		content: [{ type: "text", text: "hi there", cache_control: { type: "ephemeral" } }],
