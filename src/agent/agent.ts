@@ -10,6 +10,41 @@ import type { ToolRegistry } from "./tool-registry.ts";
 // Overridable via .env alongside ANTHROPIC_API_KEY; Haiku is the dev default.
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
 
+function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+	const lastMsg = messages.at(-1);
+	if (!lastMsg) return messages;
+
+	let newLastMsg: Anthropic.MessageParam;
+
+	if (typeof lastMsg.content === "string") {
+		// Messages with plain string content can't use cache_control, so wrap it in a content block
+		// with type "text".
+		newLastMsg = {
+			...lastMsg,
+			content: [{ type: "text", text: lastMsg.content, cache_control: { type: "ephemeral" } }],
+		};
+	} else {
+		const lastBlock = lastMsg.content.at(-1);
+		if (!lastBlock) return messages;
+
+		// Thinking blocks can't use cache_control.
+		if (lastBlock.type === "thinking" || lastBlock.type === "redacted_thinking") return messages;
+
+		// Make a copy of the last content block and add a cache_control breakpoint to it.
+		const newLastBlock: Anthropic.ContentBlockParam = {
+			...lastBlock,
+			cache_control: { type: "ephemeral" },
+		};
+
+		newLastMsg = {
+			...lastMsg,
+			content: [...lastMsg.content.slice(0, -1), newLastBlock],
+		};
+	}
+
+	return [...messages.slice(0, -1), newLastMsg];
+}
+
 export default class Agent {
 	// The running conversation. Each turn appends the user message and Claude's reply, so the model
 	// sees the full history on every request instead of just the latest line.
@@ -86,7 +121,7 @@ export default class Agent {
 					// System prompt is rendered after tool schemas, so adding a cache_control breakpoint here
 					// causes both to be cached.
 					system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-					messages: this.messages,
+					messages: withCacheBreakpoint(this.messages),
 				});
 
 				// Emit each chunk of answer text the moment it arrives. We stream ONLY text — a tool call's

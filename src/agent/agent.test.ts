@@ -126,7 +126,10 @@ test("agent: one turn streams text deltas and closes with modelResponded", async
 		{ type: "modelResponded" },
 	]);
 	expect(calls).toHaveLength(1);
-	expect(calls[0]?.messages.at(-1)).toEqual({ role: "user", content: "hi there" });
+	expect(calls[0]?.messages.at(-1)).toEqual({
+		role: "user",
+		content: [{ type: "text", text: "hi there", cache_control: { type: "ephemeral" } }],
+	});
 });
 
 test("agent: an API error surfaces as an error event and the next turn recovers", async () => {
@@ -158,7 +161,10 @@ test("agent: an API error surfaces as an error event and the next turn recovers"
 	expect(calls).toHaveLength(2);
 	expect(calls[1]?.messages).toEqual([
 		{ role: "user", content: "hi" },
-		{ role: "user", content: "try again" },
+		{
+			role: "user",
+			content: [{ type: "text", text: "try again", cache_control: { type: "ephemeral" } }],
+		},
 	]);
 });
 
