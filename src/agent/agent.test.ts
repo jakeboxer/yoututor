@@ -34,8 +34,16 @@ function textDeltaEvent(text: string): Anthropic.MessageStreamEvent {
 	return { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } };
 }
 
-// The smallest Anthropic.Message a scripted stream can resolve with: one text block, end_turn.
-function finishedMessage(text: string): Anthropic.Message {
+/**
+ * The smallest Anthropic.Message a scripted stream can resolve with: one text block, end_turn.
+ *
+ * @param text The reply's text, as a single text block.
+ * @param usage Overrides for the message's usage block, in the SDK's wire field names
+ * (`input_tokens`, `cache_read_input_tokens`, ...). Pass only the fields under test; everything
+ * else keeps the defaults — zeroed token counts and null cache fields, matching a response where
+ * caching did nothing.
+ */
+function finishedMessage(text: string, usage?: Partial<Anthropic.Usage>): Anthropic.Message {
 	return {
 		id: "msg_scripted",
 		type: "message",
@@ -56,6 +64,7 @@ function finishedMessage(text: string): Anthropic.Message {
 			output_tokens_details: null,
 			server_tool_use: null,
 			service_tier: null,
+			...usage,
 		},
 	};
 }
