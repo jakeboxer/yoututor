@@ -19,15 +19,15 @@ These are less "features" than hardening. Users only notice them when they're mi
 
 - [ ] **Context window management**
   The conversation grows without bound — frames are images and they're *big*, so a long session on a frame-heavy video will eventually blow the context limit and the request will just fail. Common strategies, roughly in order of effort:
-  - [ ] **Token usage tracking** — the API returns `usage` on every response; surface it (see status line, Tier 2) and warn as the limit nears.
+  - [ ] **Token usage tracking** — the API returns `usage` on every response; surface it (see status line, Tier 2) and warn as the limit nears. (`Agent` now accumulates session totals and `/stats` shows them on demand, via prompt caching below; the nearing-limit warning is still open.)
   - [ ] **Tool-result pruning** — drop or stub old `tool_result` blocks (especially frame images) from history after N turns; the model rarely needs to re-see old frames, and can re-fetch if it does. Cheap and very effective here since frames dominate.
   - [ ] **Compaction** — summarize the oldest turns into a single message when near the limit (what Claude Code's auto-compact does). The heavyweight option; probably only needed if pruning proves insufficient.
 
   *Lands in:* `agent.ts` owns the history, so pruning/compaction live there; usage flows out as an event.
 
-- [ ] **Prompt caching**
-  Every round-trip resends the full system prompt, tool schemas, and history. Adding `cache_control` breakpoints (system prompt + last message) is a few lines and cuts cost/latency meaningfully once conversations get long — and frame-heavy histories get long fast. Near-zero effort, pure win.
-  *Lands in:* `agent.ts` `respond()` request construction.
+- [x] **Prompt caching**
+  Every round-trip resends the full system prompt, tool schemas, and history. Two `cache_control` breakpoints (system prompt + last message, the latter attached non-mutatingly at request construction so history never carries stale markers) cut cost/latency meaningfully once conversations get long — and frame-heavy histories get long fast. Verified live on Sonnet 5: steady state is ~2 uncached input tokens per request, with the entire frame-laden history read back at ~0.1× price. Session totals are visible via `/stats` (the observability half of the same effort). Plan with full rationale: `prompt-caching.md`.
+  *Landed in:* `agent.ts` (`withCacheBreakpoint` + `respond()` request construction, usage totals, `/stats` in `run()`), the `stats` variant in `agent-event.ts`, and the stats cases in the renderers (`console-renderer.ts`, `ink-app.tsx`, `log-line-view.tsx`).
 
 ## Tier 2 — UX features users will actually reach for
 
@@ -39,6 +39,7 @@ These are less "features" than hardening. Users only notice them when they're mi
   - [ ] `/model` — show or switch the model mid-session
 
   Worth keeping deliberately small — a tutor doesn't need Claude Code's command surface. Per CLAUDE.md, this stays plain string handling, no zod.
+  `/stats` (session token totals) shipped ahead of this entry as part of prompt caching (Tier 1) — the second command after `/exit`, still plain string checks. It also produces the data the status line below would show.
   *Lands in:* the input check in `agent.ts` `run()`; if it grows past a few commands, a small command table.
 
 - [ ] **Input history & line editing**

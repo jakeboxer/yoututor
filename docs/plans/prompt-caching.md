@@ -17,7 +17,7 @@ Max 4 breakpoints per request; we use 2.
 
 **The load-bearing subtlety: don't mutate history.** `respond()` passes the live `this.messages` array to the SDK. If we attached `cache_control` by mutating the last block, every turn would add another marker — past 4 the API rejects the request, and history would be polluted with stale markers that no longer sit at the tail. So the last-message marker is attached *at request construction time* on a copy; `this.messages` never carries one.
 
-**Known caveat (document, don't fight):** each model has a minimum cacheable prefix; for Haiku 4.5 (the dev model) it's **4096 tokens**. Below the minimum a marker silently does nothing — `cache_creation_input_tokens` stays 0, no error. Our system prompt (~1.2 KB) plus three tool schemas is well under that, so the first requests of a session show zero cache activity. Once a transcript slice or frames enter history the prefix blows past 4096 and caching kicks in. This is expected behavior, not a bug — and exactly why `/stats` matters for verification.
+**Known caveat (document, don't fight):** each model has a minimum cacheable prefix; for Haiku 4.5 (the dev model) it's **4096 tokens**. Below the minimum a marker silently does nothing — `cache_creation_input_tokens` stays 0, no error. Our system prompt (~1.2 KB) plus three tool schemas is well under that, so the first requests of a session show zero cache activity. Once a transcript slice or frames enter history the prefix blows past 4096 and caching kicks in. This is expected behavior, not a bug — and exactly why `/stats` matters for verification. (Sonnet/Opus-class models have a **1024-token** minimum instead, so there the seeded `load_video` result alone crosses the line and caching kicks in on the very first request — which is what the live verification below, run on Sonnet 5, showed.)
 
 ## SDK/API facts relied on (@anthropic-ai/sdk ^0.106)
 
@@ -62,10 +62,12 @@ Call it in the request: `messages: withCacheBreakpoint(this.messages)` (name is 
 
 Renderers silently ignore unknown events (no `default` in the switches), so both need a case:
 
-- Console: one `console.log` line, e.g. `tokens: in 12345 · out 4321 · cache read 118k · cache write 9k` (format Jake's call).
+- Console: one `console.log` line.
 - Ink: new case in `handle()` appending a log line via `appendLine` (the `<Static>` fresh-array rule); new `"stats"` kind in `LogLine`, rendered `<Text dimColor>` in `LogLineView`.
 
-### 6. Tests — `src/agent/agent.test.ts`, `src/console/ink-app.test.ts`
+Final format (both renderers): `tokens: input 41413 (uncached 10 · cache write 12419 · cache read 28984) · output 1179`. The headline input number is the **sum** of the three input-side buckets — the API's `input_tokens` is only the uncached remainder, which the tail breakpoint reduces to ~2 tokens of turn scaffolding per request, so showing it bare reads as impossibly small. Cache write sits before cache read because that's chronological: tokens are written on the request that first sends them, read back on every request after.
+
+### 6. Tests — `src/agent/agent.test.ts`, `src/console/ink-app.test.ts` — ✅ done 2026-08-01
 
 `scriptedModelSession` already records every request's params, so breakpoint placement is directly assertable:
 
@@ -74,11 +76,21 @@ Renderers silently ignore unknown events (no `default` in the switches), so both
 3. **Totals + `/stats`** — script responses whose `finishedMessage` usage carries non-zero values (and one with null cache fields), drive turns then `/stats` via `hostWithInputs`, assert the `stats` event's summed totals. The existing four `toEqual` event assertions shouldn't change (`modelResponded` keeps its shape) — verify they still pass.
 4. **Ink** — `app.handle({ type: "stats", ... })` renders the dim line; assert per-line with `toContain`, run with and without `FORCE_COLOR=3`.
 
-### 7. Verify live
+### 7. Verify live — ✅ done 2026-08-01
 
 1. `bun run typecheck`, `bun run lint`, `bun test`.
 2. Real run (both Ink and `--console`): `bun src/index.ts <url>`, ask 2–3 questions — at least one that pulls frames — then `/stats`. Expect: first turns show zero cache activity (Haiku's 4096-token minimum), then cache write > 0 once history grows, then cache read climbing turn over turn. Ask another question and `/stats` again to watch read grow.
 
-### 8. Docs — `docs/plans/agent-feature-ideas.md`
+Verification record (2026-08-01, Sonnet 5, seeded video, raw counters shown in the pre-restructure line format):
+
+| After | uncached input | output | cache read | cache write |
+|---|---|---|---|---|
+| seed + greeting | 2 | 298 | 0 | 2591 |
+| question pulling 7 frames | 6 | 619 | 5507 | 11647 |
+| transcript question | 10 | 1179 | 28984 | 12419 |
+
+The numbers decompose exactly: each turn's two requests re-read the full prior prefix (e.g. 28984 − 5507 = 23477 ≈ 2 × 11738, the accumulated history size), writes carry only the new increment (frames dominate: +9056 on the frame turn), and uncached input stays flat at ~2/request — the turn-scaffolding tokens that sit after the final breakpoint. Flat ~2/request is the healthy signature; a jump of hundreds would mean content escaped the breakpoints (stale-marker bug).
+
+### 8. Docs — `docs/plans/agent-feature-ideas.md` — ✅ done 2026-08-01
 
 Tick the **Prompt caching** box with a *Landed in:* line (`agent.ts` request construction + `agent-event.ts` + renderers). Under the Tier 2 slash-commands entry, note `/stats` shipped as the second command (ahead of that entry's schedule), which also partially seeds the status-line item.
